@@ -660,7 +660,7 @@ def eligible_account(request):
     acc, remaining_minutes = random.choice(eligible)
     max_duration = min(150, int(remaining_minutes))
     target_median = min(75, (20 + max_duration) / 2)  # Use midpoint when max < 75
-    duration_minutes = round(gaussian_sample(1, 1, 1))
+    duration_minutes = round(gaussian_sample(20, max_duration, target_median))
 
     return JsonResponse({
         'eligible': True,
