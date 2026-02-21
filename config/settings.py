@@ -111,3 +111,7 @@ SESSION_RETENTION_DAYS = 60
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'session_list'
 LOGOUT_REDIRECT_URL = 'login'
+
+# Traefik reverse proxy settings
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='', cast=lambda v: [s.strip() for s in v.split(',') if s.strip()])
