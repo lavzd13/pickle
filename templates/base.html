@@ -93,7 +93,17 @@
                                 <i class="bi bi-controller"></i> Play
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'deposit_withdrawal' %}active{% endif %}" href="{% url 'deposit_withdrawal' %}">
+                                <i class="bi bi-cash-stack"></i> Deposit/Withdrawal
+                            </a>
+                        </li>
                         {% if user.is_superuser %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'deposit_withdrawal_reports' %}active{% endif %}" href="{% url 'deposit_withdrawal_reports' %}">
+                                <i class="bi bi-bar-chart"></i> D/W Reports
+                            </a>
+                        </li>
                         <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'account_list' %}active{% endif %}" href="{% url 'account_list' %}">
                                 <i class="bi bi-joystick"></i> Gaming Accounts
