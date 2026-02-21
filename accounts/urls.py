@@ -39,4 +39,11 @@ urlpatterns = [
     path('play/pause-session/', web_views.pause_session_play, name='pause_session_play'),
     path('play/resume-session/', web_views.resume_session_play, name='resume_session_play'),
     path('play/stop-session/', web_views.stop_session, name='stop_session'),
+
+    # Deposit/Withdrawals
+    path('deposit-withdrawal/', web_views.deposit_withdrawal, name='deposit_withdrawal'),
+    path('deposit-withdrawal/create/', web_views.deposit_withdrawal_create, name='deposit_withdrawal_create'),
+    path('deposit-withdrawal/reports/', web_views.deposit_withdrawal_reports, name='deposit_withdrawal_reports'),
+    path('deposit-withdrawal/history/', web_views.deposit_withdrawal_history, name='deposit_withdrawal_history'),
+    path('account-search/', web_views.account_search, name='account_search'),
 ]

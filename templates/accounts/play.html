@@ -315,19 +315,60 @@
         });
     }
 
+    // --- Audio: create AudioContext immediately, keep alive with silent oscillator ---
+    var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // Try to resume + start silent oscillator to keep audio pipeline active
+    audioCtx.resume().then(function () {
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        gain.gain.value = 0; // completely silent
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+    }).catch(function () {});
+
+    // Also unlock on any user gesture as fallback
+    ['click', 'keydown', 'touchstart'].forEach(function (evt) {
+        document.addEventListener(evt, function () {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume().then(function () {
+                    var osc = audioCtx.createOscillator();
+                    var gain = audioCtx.createGain();
+                    gain.gain.value = 0;
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start();
+                }).catch(function () {});
+            }
+        }, { once: true });
+    });
+
     function playBeep() {
+        // 1. Flash page title
+        var originalTitle = document.title;
+        var flashCount = 0;
+        var flashInterval = setInterval(function () {
+            document.title = (flashCount % 2 === 0) ? 'SESSION DONE!' : originalTitle;
+            flashCount++;
+            if (flashCount > 20) {
+                clearInterval(flashInterval);
+                document.title = originalTitle;
+            }
+        }, 500);
+
+        // 2. Play beep sound
         try {
-            var ctx = new (window.AudioContext || window.webkitAudioContext)();
-            var osc = ctx.createOscillator();
-            var gain = ctx.createGain();
+            if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+            var osc = audioCtx.createOscillator();
+            var gain = audioCtx.createGain();
             osc.connect(gain);
-            gain.connect(ctx.destination);
+            gain.connect(audioCtx.destination);
             osc.type = 'sine';
             osc.frequency.value = 880;
-            gain.gain.setValueAtTime(0.5, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.2);
-            osc.start(ctx.currentTime);
-            osc.stop(ctx.currentTime + 1.2);
+            gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.2);
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + 1.2);
         } catch (e) {}
     }
 

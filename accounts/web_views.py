@@ -8,7 +8,8 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db.models import Count, Q
 from django.utils import timezone
-from .models import PlaySession, AccountDetail, Payment, Location, Security, LastTransaction, PlayInfo
+from .models import PlaySession, AccountDetail, Payment, Location, Security, LastTransaction, PlayInfo, DepositWithdrawal
+from django.db.models import Sum
 from django.forms import modelformset_factory
 from django.http import JsonResponse
 from .forms import PlaySessionForm, DaySessionForm, AccountDetailForm, PaymentForm, UserCreateForm, UserEditForm, PlatformForm, LocationForm, SecurityForm, LastTransactionForm
@@ -659,7 +660,7 @@ def eligible_account(request):
     acc, remaining_minutes = random.choice(eligible)
     max_duration = min(150, int(remaining_minutes))
     target_median = min(75, (20 + max_duration) / 2)  # Use midpoint when max < 75
-    duration_minutes = round(gaussian_sample(20, max_duration, target_median))
+    duration_minutes = round(gaussian_sample(1, 1, 1))
 
     return JsonResponse({
         'eligible': True,
@@ -691,9 +692,9 @@ def start_session_play(request):
 
     now_local = timezone.localtime()
     today = now_local.date()
-    start_time = now_local.time().replace(second=0, microsecond=0)
+    start_time = now_local.time().replace(microsecond=0)
     end_dt = now_local + timedelta(minutes=duration_minutes)
-    end_time = end_dt.time().replace(second=0, microsecond=0)
+    end_time = end_dt.time().replace(microsecond=0)
 
     session = PlaySession.objects.create(
         account=account,
@@ -728,7 +729,15 @@ def active_sessions(request):
         end_dt = _dt.combine(today, s.end_time)
         if end_dt < start_dt:
             end_dt += timedelta(days=1)
-        seconds_left = int((end_dt - now_local.replace(tzinfo=None)).total_seconds())
+
+        if s.paused and s.pause_time:
+            # Session is paused: seconds_left = time remaining at moment of pause
+            # (end_time hasn't been extended yet — that happens on resume)
+            pause_local = timezone.localtime(s.pause_time).replace(tzinfo=None)
+            seconds_left = int((end_dt - pause_local).total_seconds())
+        else:
+            seconds_left = int((end_dt - now_local.replace(tzinfo=None)).total_seconds())
+
         if seconds_left <= 0:
             # Session should have finished already — mark it done
             s.is_active = False
@@ -842,9 +851,134 @@ def stop_session(request):
 
     # Set end_time to now (actual time played, not the scheduled end_time)
     now_local = timezone.localtime()
-    session.end_time = now_local.time().replace(second=0, microsecond=0)
+    session.end_time = now_local.time().replace(microsecond=0)
     session.is_active = False
     session.paused = False  # Clear pause state if paused
     session.save(update_fields=['end_time', 'is_active', 'paused'])
 
     return JsonResponse({'ok': True})
+
+
+@login_required
+def account_search(request):
+    """Search accounts by nickname or API key for autocomplete."""
+    q = request.GET.get('q', '').strip()
+    if len(q) < 1:
+        return JsonResponse({'results': []})
+
+    qs = AccountDetail.objects.select_related('platform')
+    if not request.user.is_superuser:
+        qs = qs.filter(play_sessions__created_by=request.user).distinct()
+
+    # Search by nick OR by API (left outer join via isnull handles missing Security)
+    qs = qs.filter(Q(nick__icontains=q) | Q(security__api__icontains=q))[:10]
+
+    results = []
+    for acc in qs:
+        api_key = ''
+        try:
+            api_key = acc.security.api or ''
+        except Security.DoesNotExist:
+            pass
+        results.append({
+            'id': acc.id,
+            'nick': acc.nick,
+            'platform': str(acc.platform) if acc.platform else '',
+            'api': api_key,
+        })
+
+    return JsonResponse({'results': results})
+
+
+@login_required
+def deposit_withdrawal(request):
+    """Deposit/Withdrawal page — form with search bar."""
+    return render(request, 'accounts/deposit_withdrawal.html')
+
+
+@login_required
+def deposit_withdrawal_create(request):
+    """Create a deposit or withdrawal entry."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    import json
+    data = json.loads(request.body)
+    account_id = data.get('account_id')
+    deposit = data.get('deposit')
+    withdrawal = data.get('withdrawal')
+
+    if not account_id:
+        return JsonResponse({'error': 'Account is required'}, status=400)
+    if not deposit and not withdrawal:
+        return JsonResponse({'error': 'Enter a deposit or withdrawal amount'}, status=400)
+
+    account = get_object_or_404(AccountDetail, pk=account_id)
+
+    entry = DepositWithdrawal.objects.create(
+        account=account,
+        deposit=deposit if deposit else None,
+        withdrawal=withdrawal if withdrawal else None,
+        created_by=request.user,
+    )
+
+    return JsonResponse({
+        'id': entry.id,
+        'account': account.nick,
+        'platform': str(account.platform) if account.platform else '',
+        'deposit': str(entry.deposit) if entry.deposit else None,
+        'withdrawal': str(entry.withdrawal) if entry.withdrawal else None,
+        'created_at': entry.created_at.strftime('%Y-%m-%d %H:%M'),
+    })
+
+
+@login_required
+@user_passes_test(is_superuser)
+def deposit_withdrawal_reports(request):
+    """Reports page — superuser only."""
+    return render(request, 'accounts/deposit_withdrawal_reports.html')
+
+
+@login_required
+@user_passes_test(is_superuser)
+def deposit_withdrawal_history(request):
+    """Return deposit/withdrawal history as JSON, with optional filters."""
+    q = request.GET.get('q', '').strip()
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+
+    qs = DepositWithdrawal.objects.select_related('account', 'account__platform')
+
+    if q:
+        qs = qs.filter(
+            Q(account__nick__icontains=q) | Q(account__security__api__icontains=q)
+        )
+    if date_from:
+        qs = qs.filter(created_at__date__gte=date_from)
+    if date_to:
+        qs = qs.filter(created_at__date__lte=date_to)
+
+    # Totals from the same filtered queryset
+    totals = qs.aggregate(
+        total_deposits=Sum('deposit'),
+        total_withdrawals=Sum('withdrawal'),
+    )
+
+    entries = []
+    for e in qs:
+        entries.append({
+            'id': e.id,
+            'account': e.account.nick,
+            'platform': str(e.account.platform) if e.account.platform else '',
+            'deposit': str(e.deposit) if e.deposit else None,
+            'withdrawal': str(e.withdrawal) if e.withdrawal else None,
+            'created_at': e.created_at.strftime('%Y-%m-%d %H:%M'),
+        })
+
+    return JsonResponse({
+        'entries': entries,
+        'totals': {
+            'deposits': str(totals['total_deposits'] or 0),
+            'withdrawals': str(totals['total_withdrawals'] or 0),
+        }
+    })

@@ -1,12 +1,9 @@
-# TODAY
-1. Add complete info for acc in acc model in DB
-2. Adjust page for adding info for acc
-3. algo for choosing acc based on new values
-4. display of new values
-
-# General info
-Make groups for users based on account platforms, so that we can split users by platforms that they are familiar with.
-
-
-# DEP
-pip install Pillow --> for image saving in DB
+1. Tracking of deposit/withdrawal
+6. JS timer latency when reloading page
+7. When session is added it should persist page reloads (when session is assigned to operator it can't disappear)
+2. Creation date of the pokerclans account field (date when it was registered in app)
+3. Add network option for payment table
+4. Put default value for withdrawal balance to be 1600. Also change the name of it, make smth better
+5. Put emoji for non Active account, also make their name little bit transparent
+8. Status of account inside of account of info (new, active, inactive, banned)
+9. Remove QUIT SESSION button once session is started

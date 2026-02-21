@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+
+{% block title %}D/W Reports{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 900px;">
+
+    <h3 class="mb-4"><i class="bi bi-bar-chart"></i> Deposit / Withdrawal Reports</h3>
+
+    <!-- Summary cards (hidden until filter applied) -->
+    <div id="totals-row" class="row mb-4" style="display:none;">
+        <div class="col-md-4">
+            <div class="card border-danger">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Total Deposits</h6>
+                    <h3 class="text-danger" id="total-deposits">-</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Total Withdrawals</h6>
+                    <h3 class="text-success" id="total-withdrawals">-</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-primary">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Net</h6>
+                    <h3 id="total-net">-</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4 position-relative">
+                    <label class="form-label">Search by Nickname or API</label>
+                    <input type="text" id="filter-q" class="form-control" placeholder="Nickname or API key..." autocomplete="off">
+                    <input type="hidden" id="filter-account-id">
+                    <div id="search-results" class="list-group position-absolute w-100 shadow" style="z-index:100; display:none; max-height:250px; overflow-y:auto;"></div>
+                    <div id="selected-account" class="mt-2" style="display:none;">
+                        <span class="badge bg-primary fs-6" id="selected-badge"></span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="btn-clear-account">Change</button>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">From</label>
+                    <input type="date" id="filter-from" class="form-control">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">To</label>
+                    <input type="date" id="filter-to" class="form-control">
+                </div>
+                <div class="col-md-4 d-flex gap-2">
+                    <button id="btn-filter" class="btn btn-primary flex-fill">Filter</button>
+                    <button id="btn-clear" class="btn btn-outline-secondary flex-fill">Clear</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- History table -->
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="table table-striped mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Date</th>
+                        <th>Account</th>
+                        <th>Platform</th>
+                        <th class="text-end">Deposit</th>
+                        <th class="text-end">Withdrawal</th>
+                    </tr>
+                </thead>
+                <tbody id="history-body">
+                    <tr><td colspan="5" class="text-center text-muted py-3">Use the filters above to view reports</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// --- Search autocomplete ---
+var searchTimer = null;
+var searchInput = document.getElementById('filter-q');
+var resultsDiv = document.getElementById('search-results');
+var accountIdInput = document.getElementById('filter-account-id');
+var selectedDiv = document.getElementById('selected-account');
+var selectedBadge = document.getElementById('selected-badge');
+var selectedNick = '';
+
+searchInput.addEventListener('input', function () {
+    clearTimeout(searchTimer);
+    var q = this.value.trim();
+    if (q.length < 1) { resultsDiv.style.display = 'none'; return; }
+
+    searchTimer = setTimeout(function () {
+        fetch('/account-search/?q=' + encodeURIComponent(q))
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                resultsDiv.innerHTML = '';
+                if (!data.results.length) {
+                    resultsDiv.innerHTML = '<div class="list-group-item text-muted">No accounts found</div>';
+                    resultsDiv.style.display = '';
+                    return;
+                }
+                data.results.forEach(function (acc) {
+                    var item = document.createElement('a');
+                    item.href = '#';
+                    item.className = 'list-group-item list-group-item-action';
+                    var label = acc.nick + ' (' + (acc.platform || 'N/A') + ')';
+                    if (acc.api) label += '  —  API: ' + acc.api;
+                    item.textContent = label;
+                    item.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        accountIdInput.value = acc.id;
+                        selectedNick = acc.nick;
+                        selectedBadge.textContent = acc.nick + ' (' + (acc.platform || 'N/A') + ')';
+                        selectedDiv.style.display = '';
+                        searchInput.style.display = 'none';
+                        resultsDiv.style.display = 'none';
+                    });
+                    resultsDiv.appendChild(item);
+                });
+                resultsDiv.style.display = '';
+            });
+    }, 250);
+});
+
+document.addEventListener('click', function (e) {
+    if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) {
+        resultsDiv.style.display = 'none';
+    }
+});
+
+document.getElementById('btn-clear-account').addEventListener('click', function () {
+    accountIdInput.value = '';
+    selectedNick = '';
+    searchInput.value = '';
+    searchInput.style.display = '';
+    selectedDiv.style.display = 'none';
+    searchInput.focus();
+});
+
+// --- Load history ---
+function loadHistory(params) {
+    var qs = new URLSearchParams(params || {}).toString();
+    fetch('/deposit-withdrawal/history/' + (qs ? '?' + qs : ''))
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            var totalsRow = document.getElementById('totals-row');
+            var dep = parseFloat(data.totals.deposits) || 0;
+            var wd = parseFloat(data.totals.withdrawals) || 0;
+            var net = wd - dep;
+
+            document.getElementById('total-deposits').textContent = dep.toFixed(2);
+            document.getElementById('total-withdrawals').textContent = wd.toFixed(2);
+            var netEl = document.getElementById('total-net');
+            netEl.textContent = (net >= 0 ? '+' : '') + net.toFixed(2);
+            netEl.className = net >= 0 ? 'text-success' : 'text-danger';
+            totalsRow.style.display = '';
+
+            var tbody = document.getElementById('history-body');
+            if (!data.entries.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No entries found</td></tr>';
+                return;
+            }
+            tbody.innerHTML = '';
+            data.entries.forEach(function (e) {
+                var tr = document.createElement('tr');
+                tr.innerHTML =
+                    '<td>' + e.created_at + '</td>' +
+                    '<td>' + e.account + '</td>' +
+                    '<td>' + (e.platform || '-') + '</td>' +
+                    '<td class="text-end">' + (e.deposit ? '<span class="text-danger fw-bold">-' + e.deposit + '</span>' : '-') + '</td>' +
+                    '<td class="text-end">' + (e.withdrawal ? '<span class="text-success fw-bold">+' + e.withdrawal + '</span>' : '-') + '</td>';
+                tbody.appendChild(tr);
+            });
+        });
+}
+
+// --- Filter / Clear ---
+document.getElementById('btn-filter').addEventListener('click', function () {
+    var params = {};
+    if (selectedNick) params.q = selectedNick;
+    else {
+        var q = searchInput.value.trim();
+        if (q) params.q = q;
+    }
+    var from = document.getElementById('filter-from').value;
+    var to = document.getElementById('filter-to').value;
+    if (from) params.date_from = from;
+    if (to) params.date_to = to;
+    loadHistory(params);
+});
+
+document.getElementById('btn-clear').addEventListener('click', function () {
+    accountIdInput.value = '';
+    selectedNick = '';
+    searchInput.value = '';
+    searchInput.style.display = '';
+    selectedDiv.style.display = 'none';
+    document.getElementById('filter-from').value = '';
+    document.getElementById('filter-to').value = '';
+    document.getElementById('totals-row').style.display = 'none';
+    document.getElementById('history-body').innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Use the filters above to view reports</td></tr>';
+});
+</script>
+{% endblock %}
