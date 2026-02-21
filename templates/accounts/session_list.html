@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block title %}Sessions - Gaming Sessions{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Gaming Sessions</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'session_create' %}" class="btn btn-success">
+            <i class="bi bi-plus-circle"></i> Create Session
+        </a>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label for="account" class="form-label">Filter by Account</label>
+                <select name="account" id="account" class="form-select">
+                    <option value="">All Accounts</option>
+                    {% for account in accounts %}
+                    <option value="{{ account.id }}" {% if selected_account == account.id|stringformat:"s" %}selected{% endif %}>
+                        {{ account }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="start_date" class="form-label">Start Date</label>
+                <input type="date" name="start_date" id="start_date" class="form-control" value="{{ start_date }}">
+            </div>
+            <div class="col-md-3">
+                <label for="end_date" class="form-label">End Date</label>
+                <input type="date" name="end_date" id="end_date" class="form-control" value="{{ end_date }}">
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="bi bi-funnel"></i> Filter
+                </button>
+                <a href="{% url 'session_list' %}" class="btn btn-secondary">
+                    <i class="bi bi-x-circle"></i> Clear
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Sessions Table -->
+<div class="card">
+    <div class="card-body">
+        {% if daily_entries %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Account</th>
+                        <th>Date</th>
+                        <th>Sessions</th>
+                        <th>Total Time</th>
+                        <th>Created By</th>
+                        <th>Notes</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in daily_entries %}
+                    <tr>
+                        <td>
+                            <strong>{{ entry.account.nick }}</strong><br>
+                            <small class="text-muted">{{ entry.account.email }}</small>
+                        </td>
+                        <td>{{ entry.session_date|date:"Y-m-d" }}</td>
+                        <td>
+                            {{ entry.session_count }} session{{ entry.session_count|pluralize }}
+                            {% for s in entry.sessions %}
+                            <div><small class="text-muted">{{ s.start_time|time:"H:i" }} - {{ s.end_time|time:"H:i" }}</small></div>
+                            {% endfor %}
+                        </td>
+                        <td><strong>{{ entry.total_duration_display }}</strong></td>
+                        <td>{{ entry.created_by.username }}</td>
+                        <td>
+                            {% if entry.notes %}
+                            {{ entry.notes|truncatewords:10 }}
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'manage_day_sessions' entry.account.id entry.session_date|date:'Y-m-d' %}" class="btn btn-sm btn-primary">
+                                <i class="bi bi-pencil-square"></i> Manage
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
+            <p class="text-muted mt-3">No sessions found.</p>
+            <a href="{% url 'session_create' %}" class="btn btn-primary">Create Your First Session</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

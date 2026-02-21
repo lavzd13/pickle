@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+
+{% block title %}Manage Sessions - {{ account.nick }} - {{ session_date|date:"Y-m-d" }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Manage Sessions</h1>
+    <a href="{% url 'session_list' %}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Sessions
+    </a>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-title mb-0">
+                    <i class="bi bi-person"></i> <strong>{{ account.nick }}</strong>
+                    <span class="text-muted mx-2">|</span>
+                    <i class="bi bi-calendar"></i> {{ session_date|date:"Y-m-d" }}
+                </h6>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Sessions</h5>
+    </div>
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            {{ formset.management_form }}
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width: 25%">Start Time</th>
+                            <th style="width: 25%">End Time</th>
+                            <th>Notes</th>
+                            <th style="width: 80px">Delete</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for form in formset %}
+                        <tr {% if form.instance.pk %}data-original-start="{{ form.instance.start_time|time:'H:i' }}" data-original-end="{{ form.instance.end_time|time:'H:i' }}" data-original-notes="{{ form.instance.notes }}"{% else %}class="table-light"{% endif %}>
+                            {{ form.id }}
+                            <td>
+                                <div class="input-group">
+                                    {{ form.start_time }}
+                                    <button type="button" class="btn btn-outline-secondary btn-sm set-now" data-target="start" title="Set current time">
+                                        <i class="bi bi-clock"></i>
+                                    </button>
+                                </div>
+                                {% if form.start_time.errors %}
+                                <div class="text-danger small">{{ form.start_time.errors }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="input-group">
+                                    {{ form.end_time }}
+                                    <button type="button" class="btn btn-outline-secondary btn-sm set-now" data-target="end" title="Set current time">
+                                        <i class="bi bi-clock"></i>
+                                    </button>
+                                </div>
+                                {% if form.end_time.errors %}
+                                <div class="text-danger small">{{ form.end_time.errors }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ form.notes }}
+                                {% if form.notes.errors %}
+                                <div class="text-danger small">{{ form.notes.errors }}</div>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if form.instance.pk %}
+                                <div class="form-check d-flex justify-content-center">
+                                    {{ form.DELETE }}
+                                </div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if formset.non_form_errors %}
+            <div class="alert alert-danger">
+                {% for error in formset.non_form_errors %}
+                <p class="mb-0">{{ error }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save"></i> Save All
+                </button>
+                <a href="{% url 'session_list' %}" class="btn btn-secondary">
+                    <i class="bi bi-x-circle"></i> Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.session-row-modified {
+    background-color: #fff3cd !important;
+    border-left: 8px solid #ffc107 !important;
+}
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    // "Now" button functionality
+    document.querySelectorAll('.set-now').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var now = new Date();
+            var hours = String(now.getHours()).padStart(2, '0');
+            var minutes = String(now.getMinutes()).padStart(2, '0');
+            var timeStr = hours + ':' + minutes;
+
+            var target = this.dataset.target;
+            var input = this.closest('.input-group').querySelector('input');
+            input.value = timeStr;
+            input.dispatchEvent(new Event('input', {bubbles: true}));
+        });
+    });
+
+    // Track changes to existing sessions
+    var rows = document.querySelectorAll('tr[data-original-start]');
+    rows.forEach(function(row) {
+        var startInput = row.querySelector('input[id*="start_time"]');
+        var endInput = row.querySelector('input[id*="end_time"]');
+        var notesInput = row.querySelector('input[id*="notes"], textarea[id*="notes"]');
+
+        var originalStart = row.dataset.originalStart;
+        var originalEnd = row.dataset.originalEnd;
+        var originalNotes = row.dataset.originalNotes;
+
+        function checkModified() {
+            var isModified =
+                startInput.value !== originalStart ||
+                endInput.value !== originalEnd ||
+                (notesInput && notesInput.value !== originalNotes);
+
+            if (isModified) {
+                row.classList.add('session-row-modified');
+            } else {
+                row.classList.remove('session-row-modified');
+            }
+        }
+
+        [startInput, endInput, notesInput].forEach(function(input) {
+            if (input) {
+                input.addEventListener('input', checkModified);
+                input.addEventListener('change', checkModified);
+            }
+        });
+    });
+
+    // Deletion confirmation - MUST run
+    var forms = document.querySelectorAll('form');
+    forms.forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            var deleteChecked = form.querySelectorAll('input[type="checkbox"][id*="DELETE"]:checked');
+
+            console.log('Form submit triggered, delete checkboxes checked:', deleteChecked.length);
+
+            if (deleteChecked.length > 0) {
+                var count = deleteChecked.length;
+                var message = 'Are you sure you want to delete ' + count + ' session' + (count > 1 ? 's' : '') + '?\n\nThis cannot be undone!';
+
+                var confirmed = confirm(message);
+                console.log('User confirmed:', confirmed);
+
+                if (!confirmed) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                }
+            }
+        }, true);
+    });
+})();
+</script>
+{% endblock %}

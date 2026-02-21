@@ -1,0 +1,415 @@
+{% extends 'base.html' %}
+
+{% block title %}Play{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 560px;">
+
+    <!-- Top action button -->
+    <div class="text-center mb-4">
+        <button id="btn-play" class="btn btn-primary btn-lg" style="font-size: 2rem; padding: 1.2rem 3rem;">
+            PLAY
+        </button>
+        <div id="no-accounts-msg" class="alert alert-warning mt-3" style="display:none;">
+            <i class="bi bi-calendar-x"></i> No eligible accounts available right now.
+        </div>
+    </div>
+
+    <!-- Active session cards injected here -->
+    <div id="session-list"></div>
+
+</div>
+
+<!-- Session card template (hidden) -->
+<template id="session-card-tpl">
+    <div class="card shadow mb-3 session-card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <h5 class="card-title fw-bold mb-0 card-nick"></h5>
+                <div class="d-flex gap-2 align-items-center">
+                    <span class="badge bg-secondary card-status" style="font-size:0.95rem; padding: 0.4em 0.75em;">Pending</span>
+                    <button class="btn btn-sm btn-outline-danger card-quit-btn" title="Quit session">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="mb-2" style="font-size:0.9rem;">
+                <div><span class="text-muted">Platform:</span> <span class="card-platform"></span></div>
+                <div><span class="text-muted">Phone:</span> <span class="card-phone"></span></div>
+                <div><span class="text-muted">Withdraw Pass:</span> <span class="card-withdraw-pass"></span></div>
+                <div><span class="text-muted">Min Balance:</span> $<span class="card-min-balance"></span></div>
+            </div>
+            <div class="card-pending-section">
+                <p class="text-muted mb-1">Duration: <strong class="card-duration"></strong> min</p>
+                <p class="text-muted mb-2" style="font-size:0.85rem;">Remaining today: <strong class="card-remaining"></strong> min</p>
+                <button class="btn btn-success card-start-btn" style="font-size:1.1rem; padding: 0.5rem 1.5rem;">
+                    <i class="bi bi-play-fill"></i> Start Session
+                </button>
+            </div>
+            <div class="card-running-section" style="display:none;">
+                <div class="d-flex align-items-center gap-3 mb-2">
+                    <div class="display-6 fw-bold card-timer">--:--</div>
+                    <small class="text-muted">ends at <span class="card-end-time"></span></small>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-warning btn-sm card-pause-btn">
+                        <i class="bi bi-pause-fill"></i> Pause
+                    </button>
+                    <button class="btn btn-success btn-sm card-resume-btn" style="display:none;">
+                        <i class="bi bi-play-fill"></i> Resume
+                    </button>
+                    <button class="btn btn-danger btn-sm card-stop-btn">
+                        <i class="bi bi-stop-fill"></i> Stop
+                    </button>
+                </div>
+            </div>
+            <div class="card-done-section alert alert-success mb-0 mt-2" style="display:none;">
+                <i class="bi bi-check-circle-fill"></i> Session complete!
+            </div>
+        </div>
+    </div>
+</template>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    // Track account IDs currently displayed (pending or running)
+    var displayedAccountIds = new Set();
+    var sessionCount = 0;
+
+    function getCsrf() {
+        return document.cookie.split(';').map(c => c.trim())
+            .find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
+    }
+
+    function hideNoAccounts() {
+        document.getElementById('no-accounts-msg').style.display = 'none';
+    }
+
+    function showNoAccounts() {
+        document.getElementById('no-accounts-msg').style.display = 'block';
+    }
+
+    function fetchAndAddSession() {
+        hideNoAccounts();
+        var excluded = Array.from(displayedAccountIds).join(',');
+        var url = '/play/eligible-account/' + (excluded ? '?excluded=' + excluded : '');
+        fetch(url)
+            .then(r => r.json())
+            .then(function (data) {
+                if (!data.eligible) {
+                    showNoAccounts();
+                    return;
+                }
+                addSessionCard(data.account, data.duration_minutes, data.remaining_minutes);
+            })
+            .catch(showNoAccounts);
+    }
+
+    function addSessionCard(account, durationMinutes, remainingMinutes) {
+        displayedAccountIds.add(account.id);
+
+        var tpl = document.getElementById('session-card-tpl');
+        var card = tpl.content.cloneNode(true).querySelector('.session-card');
+        card.dataset.accountId = account.id;
+        var sessionId = null;
+
+        card.querySelector('.card-nick').textContent = account.nick;
+        card.querySelector('.card-platform').textContent = account.platform || '-';
+        card.querySelector('.card-phone').textContent = account.phone || '-';
+        card.querySelector('.card-withdraw-pass').textContent = account.withdraw_pass || '-';
+        card.querySelector('.card-min-balance').textContent = account.min_balance || '0.00';
+        card.querySelector('.card-duration').textContent = durationMinutes;
+        card.querySelector('.card-remaining').textContent = remainingMinutes;
+
+        // Quit button
+        card.querySelector('.card-quit-btn').addEventListener('click', function () {
+            displayedAccountIds.delete(account.id);
+            if (sessionId) {
+                fetch('/play/finish-session/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                    body: JSON.stringify({ session_id: sessionId }),
+                }).finally(function () { card.remove(); });
+            } else {
+                card.remove();
+            }
+        });
+
+        // Start button
+        card.querySelector('.card-start-btn').addEventListener('click', function () {
+            card.querySelector('.card-start-btn').disabled = true;
+            card.querySelector('.card-status').textContent = 'Starting...';
+
+            fetch('/play/start-session/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                body: JSON.stringify({ account_id: account.id, duration_minutes: durationMinutes }),
+            })
+            .then(r => r.json())
+            .then(function (data) {
+                sessionId = data.session_id;
+                card.querySelector('.card-pending-section').style.display = 'none';
+                card.querySelector('.card-running-section').style.display = 'block';
+                card.querySelector('.card-status').textContent = 'Playing';
+                card.querySelector('.card-status').className = 'badge bg-success card-status';
+                card.style.backgroundColor = '#d1f5d3';
+                card.style.borderColor = '#6dbb74';
+                const endDate = new Date(Date.now() + durationMinutes * 60000);
+                const hh = String(endDate.getHours()).padStart(2, '0');
+                const mm = String(endDate.getMinutes()).padStart(2, '0');
+                card.querySelector('.card-end-time').textContent = hh + ':' + mm;
+                startCountdown(card, durationMinutes * 60, function () {
+                    finishSession(card, sessionId, account.id);
+                });
+                setupPauseResume(card, sessionId, account.id);
+            });
+        });
+
+        document.getElementById('session-list').prepend(card);
+        sessionCount++;
+
+        if (sessionCount === 1) {
+            var btn = document.getElementById('btn-play');
+            btn.innerHTML = '<i class="bi bi-plus-circle"></i> Add One More Session';
+            btn.classList.replace('btn-primary', 'btn-outline-primary');
+            btn.style.fontSize = '1rem';
+            btn.style.padding = '0.5rem 1.5rem';
+        }
+    }
+
+    function startCountdown(card, totalSeconds, onDone) {
+        var timerEl = card.querySelector('.card-timer');
+        card._secondsLeft = totalSeconds;
+        card._onDone = onDone;
+
+        function tick() {
+            if (card._secondsLeft <= 0) {
+                clearInterval(card._interval);
+                timerEl.textContent = '00:00';
+                onDone();
+                return;
+            }
+            var m = Math.floor(card._secondsLeft / 60);
+            var s = card._secondsLeft % 60;
+            timerEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+            card._secondsLeft--;
+        }
+        tick();
+        card._interval = setInterval(tick, 1000);
+    }
+
+    function pauseCountdown(card) {
+        if (card._interval) {
+            clearInterval(card._interval);
+            card._interval = null;
+        }
+    }
+
+    function resumeCountdown(card) {
+        var timerEl = card.querySelector('.card-timer');
+        function tick() {
+            if (card._secondsLeft <= 0) {
+                clearInterval(card._interval);
+                timerEl.textContent = '00:00';
+                card._onDone();
+                return;
+            }
+            var m = Math.floor(card._secondsLeft / 60);
+            var s = card._secondsLeft % 60;
+            timerEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+            card._secondsLeft--;
+        }
+        tick();
+        card._interval = setInterval(tick, 1000);
+    }
+
+    function setupPauseResume(card, sessionId, accountId) {
+        var pauseBtn = card.querySelector('.card-pause-btn');
+        var resumeBtn = card.querySelector('.card-resume-btn');
+        var statusBadge = card.querySelector('.card-status');
+
+        pauseBtn.addEventListener('click', function () {
+            pauseBtn.disabled = true;
+            fetch('/play/pause-session/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                body: JSON.stringify({ session_id: sessionId }),
+            })
+            .then(r => r.json())
+            .then(function (data) {
+                if (data.ok) {
+                    pauseCountdown(card);
+                    pauseBtn.style.display = 'none';
+                    resumeBtn.style.display = 'inline-block';
+                    statusBadge.textContent = 'Paused';
+                    statusBadge.className = 'badge bg-warning card-status';
+                    pauseBtn.disabled = false;
+                }
+            });
+        });
+
+        resumeBtn.addEventListener('click', function () {
+            resumeBtn.disabled = true;
+            fetch('/play/resume-session/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                body: JSON.stringify({ session_id: sessionId }),
+            })
+            .then(r => r.json())
+            .then(function (data) {
+                if (data.ok && data.seconds_left) {
+                    card._secondsLeft = data.seconds_left;
+                    // Update displayed end time
+                    const newEndDate = new Date(Date.now() + data.seconds_left * 1000);
+                    const hh = String(newEndDate.getHours()).padStart(2, '0');
+                    const mm = String(newEndDate.getMinutes()).padStart(2, '0');
+                    card.querySelector('.card-end-time').textContent = hh + ':' + mm;
+                    resumeCountdown(card);
+                    resumeBtn.style.display = 'none';
+                    pauseBtn.style.display = 'inline-block';
+                    statusBadge.textContent = 'Playing';
+                    statusBadge.className = 'badge bg-success card-status';
+                    resumeBtn.disabled = false;
+                }
+            });
+        });
+
+        var stopBtn = card.querySelector('.card-stop-btn');
+        stopBtn.addEventListener('click', function () {
+            if (!confirm('Stop this session early? The actual time played will be saved.')) {
+                return;
+            }
+            stopBtn.disabled = true;
+            pauseCountdown(card);  // Stop the timer
+            fetch('/play/stop-session/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                body: JSON.stringify({ session_id: sessionId }),
+            })
+            .then(r => r.json())
+            .then(function (data) {
+                if (data.ok) {
+                    finishSession(card, sessionId, accountId);
+                }
+            });
+        });
+    }
+
+    function finishSession(card, sessionId, accountId) {
+        fetch('/play/finish-session/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+            body: JSON.stringify({ session_id: sessionId }),
+        })
+        .then(function () {
+            displayedAccountIds.delete(accountId);
+            card.querySelector('.card-running-section').style.display = 'none';
+            card.querySelector('.card-done-section').style.display = 'block';
+            card.querySelector('.card-status').textContent = 'Done';
+            card.querySelector('.card-status').className = 'badge bg-secondary card-status';
+            card.querySelector('.card-quit-btn').style.display = 'none';
+            playBeep();
+            setTimeout(function () { card.remove(); }, 10000);
+        });
+    }
+
+    function playBeep() {
+        try {
+            var ctx = new (window.AudioContext || window.webkitAudioContext)();
+            var osc = ctx.createOscillator();
+            var gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'sine';
+            osc.frequency.value = 880;
+            gain.gain.setValueAtTime(0.5, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.2);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 1.2);
+        } catch (e) {}
+    }
+
+    function restoreActiveSessions() {
+        fetch('/play/active-sessions/')
+            .then(function (r) {
+                if (!r.ok) { console.error('active-sessions HTTP error', r.status); return null; }
+                return r.json();
+            })
+            .then(function (data) {
+                if (!data) return;
+data.sessions.forEach(function (s) {
+                    restoreSessionCard(s.account, s.session_id, s.seconds_left, s.end_time, s.paused);
+                });
+            })
+            .catch(function (e) { console.error('active-sessions fetch error', e); });
+    }
+
+    function restoreSessionCard(account, sessionId, secondsLeft, endTime, paused) {
+        displayedAccountIds.add(account.id);
+
+        var tpl = document.getElementById('session-card-tpl');
+        var card = tpl.content.cloneNode(true).querySelector('.session-card');
+        card.dataset.accountId = account.id;
+
+        card.querySelector('.card-nick').textContent = account.nick;
+        card.querySelector('.card-platform').textContent = account.platform || '-';
+        card.querySelector('.card-phone').textContent = account.phone || '-';
+        card.querySelector('.card-withdraw-pass').textContent = account.withdraw_pass || '-';
+        card.querySelector('.card-min-balance').textContent = account.min_balance || '0.00';
+        card.querySelector('.card-pending-section').style.display = 'none';
+        card.querySelector('.card-running-section').style.display = 'block';
+        const restoredEnd = new Date(Date.now() + secondsLeft * 1000);
+        const rHH = String(restoredEnd.getHours()).padStart(2, '0');
+        const rMM = String(restoredEnd.getMinutes()).padStart(2, '0');
+        card.querySelector('.card-end-time').textContent = rHH + ':' + rMM;
+        card.style.backgroundColor = '#d1f5d3';
+        card.style.borderColor = '#6dbb74';
+
+        if (paused) {
+            card.querySelector('.card-status').textContent = 'Paused';
+            card.querySelector('.card-status').className = 'badge bg-warning card-status';
+            card.querySelector('.card-pause-btn').style.display = 'none';
+            card.querySelector('.card-resume-btn').style.display = 'inline-block';
+            // Don't start countdown yet - user must resume
+            card._secondsLeft = secondsLeft;
+            card._onDone = function () {
+                finishSession(card, sessionId, account.id);
+            };
+        } else {
+            card.querySelector('.card-status').textContent = 'Playing';
+            card.querySelector('.card-status').className = 'badge bg-success card-status';
+            startCountdown(card, secondsLeft, function () {
+                finishSession(card, sessionId, account.id);
+            });
+        }
+
+        card.querySelector('.card-quit-btn').addEventListener('click', function () {
+            displayedAccountIds.delete(account.id);
+            fetch('/play/finish-session/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                body: JSON.stringify({ session_id: sessionId }),
+            }).finally(function () { card.remove(); });
+        });
+
+        setupPauseResume(card, sessionId, account.id);
+
+        document.getElementById('session-list').prepend(card);
+        sessionCount++;
+
+        if (sessionCount === 1) {
+            var btn = document.getElementById('btn-play');
+            btn.innerHTML = '<i class="bi bi-plus-circle"></i> Add One More Session';
+            btn.classList.replace('btn-primary', 'btn-outline-primary');
+            btn.style.fontSize = '1rem';
+            btn.style.padding = '0.5rem 1.5rem';
+        }
+    }
+
+    restoreActiveSessions();
+    document.getElementById('btn-play').addEventListener('click', fetchAndAddSession);
+})();
+</script>
+{% endblock %}

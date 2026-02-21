@@ -1,0 +1,10 @@
+version: '3.8'
+
+# Dev-only overrides to expose Django port to your LAN for testing.
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+services:
+  web:
+    ports:
+      - "8000:8000"

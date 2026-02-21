@@ -1,0 +1,67 @@
+version: '3.8'
+
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:5432:5432"
+    networks:
+      - app-network
+
+  web:
+    build: .
+    restart: unless-stopped
+    command: sh ./scripts/entrypoint.sh
+    volumes:
+      - .:/app
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.django.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.django.entrypoints=websecure"
+      - "traefik.http.routers.django.tls.certresolver=le"
+      - "traefik.http.services.django.loadbalancer.server.port=8000"
+      # HTTP -> HTTPS redirect
+      - "traefik.http.routers.django-http.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.django-http.entrypoints=web"
+      - "traefik.http.routers.django-http.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+    env_file:
+      - .env
+    depends_on:
+      - db
+    networks:
+      - app-network
+
+  traefik:
+    image: traefik:v3.1
+    command:
+      - "--api.dashboard=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.le.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.le.acme.httpchallenge=true"
+      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "letsencrypt:/letsencrypt"
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+volumes:
+  db:
+  letsencrypt:

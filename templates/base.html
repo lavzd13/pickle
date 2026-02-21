@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Gaming Sessions{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+        body {
+            min-height: 100vh;
+            background-color: #f8f9fa;
+        }
+        .sidebar {
+            min-height: 100vh;
+            background-color: #212529;
+        }
+        .sidebar .nav-link {
+            color: #adb5bd;
+            padding: 0.75rem 1rem;
+        }
+        .sidebar .nav-link:hover {
+            color: #fff;
+            background-color: #343a40;
+        }
+        .sidebar .nav-link.active {
+            color: #fff;
+            background-color: #0d6efd;
+        }
+        .content {
+            padding: 2rem;
+        }
+        .card {
+            box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+            margin-bottom: 1.5rem;
+        }
+        .flatpickr-calendar.hasTime .flatpickr-time {
+            max-height: none;
+            height: 80px;
+            padding: 10px 0;
+        }
+        .flatpickr-time input.flatpickr-hour,
+        .flatpickr-time input.flatpickr-minute {
+            font-size: 1.6rem;
+            font-weight: 600;
+        }
+        .flatpickr-time .flatpickr-time-separator {
+            font-size: 1.6rem;
+            font-weight: 600;
+        }
+        .flatpickr-time .numInputWrapper span {
+            right: 0;
+            left: 1;
+            width: 20%;
+        }
+        .flatpickr-time .numInputWrapper span.arrowUp {
+            top: 0;
+            height: 50%;
+        }
+        .flatpickr-time .numInputWrapper span.arrowDown {
+            bottom: 0;
+            top: auto;
+            height: 50%;
+        }
+        .flatpickr-time .numInputWrapper span:after {
+            left: 50%;
+            transform: translateX(-50%);
+        }
+    </style>
+</head>
+<body>
+    {% if user.is_authenticated %}
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav class="col-md-3 col-lg-2 d-md-block sidebar">
+                <div class="position-sticky pt-3">
+                    <h5 class="text-white px-3 mb-3">Gaming Sessions</h5>
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
+                                <i class="bi bi-speedometer2"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'session_list' %}active{% endif %}" href="{% url 'session_list' %}">
+                                <i class="bi bi-controller"></i> Sessions
+                            </a>
+                        </li>
+						<li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'play' %}active{% endif %}" href="{% url 'play' %}">
+                                <i class="bi bi-controller"></i> Play
+                            </a>
+                        </li>
+                        {% if user.is_superuser %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'account_list' %}active{% endif %}" href="{% url 'account_list' %}">
+                                <i class="bi bi-joystick"></i> Gaming Accounts
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}" href="{% url 'user_list' %}">
+                                <i class="bi bi-people"></i> System Users
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                    
+                    <hr class="text-white">
+                    
+                    <div class="px-3">
+                        <p class="text-white-50 small mb-1">Logged in as:</p>
+                        <p class="text-white">{{ user.username }}</p>
+                        {% if user.is_superuser %}
+                        <span class="badge bg-danger">Superuser</span>
+                        {% else %}
+                        <span class="badge bg-primary">User</span>
+                        {% endif %}
+                        <br><br>
+                        <form method="post" action="{% url 'logout' %}" style="display: inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-light btn-sm">
+                                <i class="bi bi-box-arrow-right"></i> Logout
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Main content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 content">
+                {% if messages %}
+                    {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+    {% else %}
+    <div class="container">
+        {% block login_content %}{% endblock %}
+    </div>
+    {% endif %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script>
+        document.querySelectorAll('.timepicker').forEach(function(el) {
+            var fp = flatpickr(el, {
+                enableTime: true,
+                noCalendar: true,
+                dateFormat: "H:i",
+                time_24hr: true,
+                minuteIncrement: 1,
+                onReady: function(selectedDates, dateStr, instance) {
+                    var wrapper = instance.calendarContainer;
+                    wrapper.querySelectorAll('.numInputWrapper input').forEach(function(input) {
+                        input.addEventListener('wheel', function(e) {
+                            e.preventDefault();
+                            var isHour = input.classList.contains('flatpickr-hour');
+                            var val = parseInt(input.value) || 0;
+                            if (e.deltaY < 0) {
+                                val = isHour ? (val + 1) % 24 : (val + 1) % 60;
+                            } else {
+                                val = isHour ? (val - 1 + 24) % 24 : (val - 1 + 60) % 60;
+                            }
+                            input.value = val < 10 ? '0' + val : val;
+                            input.dispatchEvent(new Event('input', {bubbles: true}));
+                        });
+                    });
+                }
+            });
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

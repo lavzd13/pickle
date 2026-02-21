@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+
+{% block title %}Accounts - Gaming Sessions{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Gaming Accounts</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'account_create' %}" class="btn btn-success">
+            <i class="bi bi-plus-circle"></i> Create Gaming Account
+        </a>
+    </div>
+</div>
+
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Gaming accounts are game records for tracking sessions. They do not provide login access. To create users who can login, use <a href="{% url 'user_list' %}">System Users</a>.
+</div>
+
+{% if accounts %}
+<div class="list-group">
+    {% for account in accounts %}
+    <div class="list-group-item p-0">
+
+        <div class="d-flex align-items-center justify-content-between px-3 py-2">
+            <button class="btn btn-link text-start text-decoration-none text-dark p-0 fw-bold"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#details-{{ account.pk }}">
+                <i class="bi bi-chevron-right me-2 toggle-icon"></i>{{ account.nick }}{% if account.platform %} <span class="text-muted fw-normal">({{ account.platform }})</span>{% if account.last_transaction.first_withdraw %} ✅{% endif %}{% endif %}
+            </button>
+            <div class="d-flex gap-2">
+                <a href="{% url 'account_sessions' account.pk %}" class="btn btn-sm btn-info" title="View Sessions">
+                    <i class="bi bi-calendar-check"></i>
+                </a>
+                <a href="{% url 'account_edit' account.pk %}" class="btn btn-sm btn-primary" title="Edit">
+                    <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{% url 'account_delete' account.pk %}" class="btn btn-sm btn-danger" title="Delete">
+                    <i class="bi bi-trash"></i>
+                </a>
+            </div>
+        </div>
+
+        <div class="collapse" id="details-{{ account.pk }}">
+            <div class="px-4 pb-3 pt-1 border-top" style="font-size: 0.9rem;">
+
+                <div class="row">
+                    <div class="col-md-4">
+                        <p class="fw-semibold mb-1 mt-2">Account</p>
+                        <div><span class="text-muted">Email:</span> {{ account.email|default:"-" }}</div>
+                        <div><span class="text-muted">Phone:</span> {{ account.phone|default:"-" }}</div>
+                        <div><span class="text-muted">Device:</span> {{ account.device_name|default:"-" }}</div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <p class="fw-semibold mb-1 mt-2">Play Info</p>
+                        {% if account.play_info %}
+                        <div><span class="text-muted">Holiday days/year:</span> {{ account.play_info.holiday_days_per_year }}</div>
+                        <div><span class="text-muted">Play days/week:</span> {{ account.play_info.play_days_per_week }}</div>
+                        <div><span class="text-muted">Hours/day:</span> {{ account.play_info.hours_per_day }}</div>
+                        {% else %}
+                        <div class="text-muted">Not set</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-4">
+                        <p class="fw-semibold mb-1 mt-2">Payment</p>
+                        {% if account.payment %}
+                        <div><span class="text-muted">Withdrawal balance:</span> ${{ account.payment.min_balance }}</div>
+                        <div><span class="text-muted">Withdraw pass:</span> {{ account.payment.withdraw_pass|default:"-" }}</div>
+                        <div><span class="text-muted">Crypto wallet:</span> {{ account.payment.crypto_wallet|default:"-" }}</div>
+                        {% else %}
+                        <div class="text-muted">Not set</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-4">
+                        <p class="fw-semibold mb-1 mt-2">Location</p>
+                        {% if account.location %}
+                        <div><span class="text-muted">Country:</span> {{ account.location.country|default:"-" }}</div>
+                        <div><span class="text-muted">IP:</span> {{ account.location.ip|default:"-" }}</div>
+                        <div><span class="text-muted">Proxy/VPN:</span> {{ account.location.proxy_vpn|default:"-" }}</div>
+                        <div><span class="text-muted">Lat/Lng:</span> {{ account.location.latitude|default:"-" }} / {{ account.location.longtitude|default:"-" }}</div>
+                        {% else %}
+                        <div class="text-muted">Not set</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-4">
+                        <p class="fw-semibold mb-1 mt-2">Security</p>
+                        {% if account.security %}
+                        <div><span class="text-muted">App ID:</span> {{ account.security.app_id|default:"-" }}</div>
+                        <div><span class="text-muted">Login:</span> {{ account.security.login|default:"-" }}</div>
+                        <div><span class="text-muted">Password:</span> {{ account.security.login_pass|default:"-" }}</div>
+                        <div><span class="text-muted">API:</span> {{ account.security.api|default:"-" }}</div>
+                        {% else %}
+                        <div class="text-muted">Not set</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-4">
+                        <p class="fw-semibold mb-1 mt-2">Last Transaction</p>
+                        {% if account.last_transaction %}
+                        <div><span class="text-muted">TXID:</span> {{ account.last_transaction.txid|default:"-" }}</div>
+                        <div><span class="text-muted">Wallet:</span> {{ account.last_transaction.wallet|default:"-" }}</div>
+                        <div><span class="text-muted">Network:</span> {{ account.last_transaction.network|default:"-" }}</div>
+                        <div><span class="text-muted">Time:</span> {{ account.last_transaction.time|default:"-" }}</div>
+                        <div>
+                            <span class="text-muted">Picture:</span>
+                            {% if account.last_transaction.picture %}
+                            <a href="{{ account.last_transaction.picture.url }}" target="_blank">{{ account.last_transaction.picture.name|slice:"13:" }}</a>
+                            {% else %}-{% endif %}
+                        </div>
+                        {% else %}
+                        <div class="text-muted">Not set</div>
+                        {% endif %}
+                        {% if account.last_transaction.first_withdraw %}<p class="fw-bold mb-1">First withdrawal made</p>{% endif %}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
+    <p class="text-muted mt-3">No accounts found.</p>
+    <a href="{% url 'account_create' %}" class="btn btn-primary">Create Your First Account</a>
+</div>
+{% endif %}
+{% endblock %}

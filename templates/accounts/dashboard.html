@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Gaming Sessions{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Dashboard</h1>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-controller"></i> Total Sessions
+                </h5>
+                <h2 class="card-text">{{ total_sessions }}</h2>
+                <small>All time</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-calendar-check"></i> Recent Sessions
+                </h5>
+                <h2 class="card-text">{{ recent_sessions_count }}</h2>
+                <small>Last 60 days</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-people"></i> Accounts
+                </h5>
+                <h2 class="card-text">{{ accounts_count }}</h2>
+                <small>Poker accounts</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Recent Sessions</h5>
+            </div>
+            <div class="card-body">
+                {% if daily_entries %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Account</th>
+                                <th>Date</th>
+                                <th>Total Time</th>
+                                <th>Sessions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entry in daily_entries %}
+                            <tr>
+                                <td>{{ entry.account.nick }}</td>
+                                <td>{{ entry.session_date|date:"Y-m-d" }}</td>
+                                <td><strong>{{ entry.total_duration_display }}</strong></td>
+                                <td>{{ entry.session_count }} session{{ entry.session_count|pluralize }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <a href="{% url 'session_list' %}" class="btn btn-primary">View All Sessions</a>
+                {% else %}
+                <p class="text-muted">No sessions found.</p>
+                <a href="{% url 'session_create' %}" class="btn btn-primary">Create Your First Session</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <a href="{% url 'session_create' %}" class="btn btn-success me-2">
+                    <i class="bi bi-plus-circle"></i> Create New Session
+                </a>
+                <a href="{% url 'session_list' %}" class="btn btn-primary me-2">
+                    <i class="bi bi-list"></i> View All Sessions
+                </a>
+                {% if user.is_superuser %}
+                <a href="{% url 'account_list' %}" class="btn btn-info me-2">
+                    <i class="bi bi-joystick"></i> Manage Gaming Accounts
+                </a>
+                <a href="{% url 'account_create' %}" class="btn btn-warning me-2">
+                    <i class="bi bi-plus-circle"></i> Create Gaming Account
+                </a>
+                <a href="{% url 'user_list' %}" class="btn btn-secondary">
+                    <i class="bi bi-people"></i> Manage System Users
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

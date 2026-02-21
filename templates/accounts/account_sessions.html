@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+
+{% block title %}Account Sessions - Gaming Sessions{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Sessions for {{ account.nick }}</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'account_list' %}" class="btn btn-secondary me-2">
+            <i class="bi bi-arrow-left"></i> Back to Accounts
+        </a>
+        <a href="{% url 'session_create' %}" class="btn btn-success">
+            <i class="bi bi-plus-circle"></i> Create Session
+        </a>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-title">Account Information</h6>
+                <p class="mb-1"><strong>Nick:</strong> {{ account.nick }}</p>
+                <p class="mb-1"><strong>Email:</strong> {{ account.email }}</p>
+                <p class="mb-1"><strong>Country:</strong> {{ account.country }}</p>
+                {% if account.phone %}
+                <p class="mb-1"><strong>Phone:</strong> {{ account.phone }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card text-white bg-primary">
+                    <div class="card-body">
+                        <h6 class="card-title">Total Sessions</h6>
+                        <h3>{{ total_sessions }}</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-white bg-success">
+                    <div class="card-body">
+                        <h6 class="card-title">Recent (60 days)</h6>
+                        <h3>{{ recent_sessions_count }}</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-white bg-warning">
+                    <div class="card-body">
+                        <h6 class="card-title">Older Sessions</h6>
+                        <h3>{{ old_sessions_count }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">All Sessions (Including Past 60 Days)</h5>
+    </div>
+    <div class="card-body">
+        {% if daily_entries %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> As a superuser, you can view all sessions including those older than 60 days.
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Sessions</th>
+                        <th>Total Time</th>
+                        <th>Created By</th>
+                        <th>Notes</th>
+                        <th>Age</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in daily_entries %}
+                    <tr {% if entry.session_date < cutoff_date %}class="table-warning"{% endif %}>
+                        <td>{{ entry.session_date|date:"Y-m-d" }}</td>
+                        <td>
+                            {{ entry.session_count }} session{{ entry.session_count|pluralize }}
+                            {% for s in entry.sessions %}
+                            <div><small class="text-muted">{{ s.start_time|time:"H:i" }} - {{ s.end_time|time:"H:i" }}</small></div>
+                            {% endfor %}
+                        </td>
+                        <td><strong>{{ entry.total_duration_display }}</strong></td>
+                        <td>{{ entry.created_by.username }}</td>
+                        <td>
+                            {% if entry.notes %}
+                            {{ entry.notes|truncatewords:10 }}
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ entry.session_date|timesince }} ago</td>
+                        <td>
+                            <a href="{% url 'manage_day_sessions' entry.account.id entry.session_date|date:'Y-m-d' %}" class="btn btn-sm btn-primary">
+                                <i class="bi bi-pencil-square"></i> Manage
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="alert alert-warning mt-3">
+            <i class="bi bi-exclamation-triangle"></i> Rows highlighted in yellow are older than 60 days and would not be visible to regular users.
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
+            <p class="text-muted mt-3">No sessions found for this account.</p>
+            <a href="{% url 'session_create' %}" class="btn btn-primary">Create First Session</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
