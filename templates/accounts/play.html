@@ -179,51 +179,93 @@
         }
     }
 
+    // --- Timestamp-based countdown (immune to background throttling) ---
+    // All running cards tracked here so visibilitychange can re-tick them
+    var runningCards = new Set();
+
     function startCountdown(card, totalSeconds, onDone) {
         var timerEl = card.querySelector('.card-timer');
-        card._secondsLeft = totalSeconds;
+        card._endTimestamp = Date.now() + totalSeconds * 1000;
         card._onDone = onDone;
+        card._paused = false;
+        runningCards.add(card);
 
         function tick() {
-            if (card._secondsLeft <= 0) {
+            if (card._paused) return;
+            var remaining = Math.round((card._endTimestamp - Date.now()) / 1000);
+            if (remaining <= 0) {
                 clearInterval(card._interval);
+                card._interval = null;
+                runningCards.delete(card);
                 timerEl.textContent = '00:00';
                 onDone();
                 return;
             }
-            var m = Math.floor(card._secondsLeft / 60);
-            var s = card._secondsLeft % 60;
+            var m = Math.floor(remaining / 60);
+            var s = remaining % 60;
             timerEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
-            card._secondsLeft--;
         }
         tick();
         card._interval = setInterval(tick, 1000);
     }
 
     function pauseCountdown(card) {
+        card._paused = true;
+        // Save how many seconds were left at pause time
+        card._pausedSecondsLeft = Math.max(0, Math.round((card._endTimestamp - Date.now()) / 1000));
         if (card._interval) {
             clearInterval(card._interval);
             card._interval = null;
         }
+        runningCards.delete(card);
     }
 
-    function resumeCountdown(card) {
+    function resumeCountdown(card, secondsLeft) {
         var timerEl = card.querySelector('.card-timer');
+        var secs = secondsLeft != null ? secondsLeft : card._pausedSecondsLeft;
+        card._endTimestamp = Date.now() + secs * 1000;
+        card._paused = false;
+        runningCards.add(card);
+
         function tick() {
-            if (card._secondsLeft <= 0) {
+            if (card._paused) return;
+            var remaining = Math.round((card._endTimestamp - Date.now()) / 1000);
+            if (remaining <= 0) {
                 clearInterval(card._interval);
+                card._interval = null;
+                runningCards.delete(card);
                 timerEl.textContent = '00:00';
                 card._onDone();
                 return;
             }
-            var m = Math.floor(card._secondsLeft / 60);
-            var s = card._secondsLeft % 60;
+            var m = Math.floor(remaining / 60);
+            var s = remaining % 60;
             timerEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
-            card._secondsLeft--;
         }
         tick();
         card._interval = setInterval(tick, 1000);
     }
+
+    // When tab becomes visible again, immediately re-tick all running cards
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) {
+            runningCards.forEach(function (card) {
+                var timerEl = card.querySelector('.card-timer');
+                var remaining = Math.round((card._endTimestamp - Date.now()) / 1000);
+                if (remaining <= 0) {
+                    clearInterval(card._interval);
+                    card._interval = null;
+                    runningCards.delete(card);
+                    timerEl.textContent = '00:00';
+                    card._onDone();
+                } else {
+                    var m = Math.floor(remaining / 60);
+                    var s = remaining % 60;
+                    timerEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+                }
+            });
+        }
+    });
 
     function setupPauseResume(card, sessionId, accountId) {
         var pauseBtn = card.querySelector('.card-pause-btn');
@@ -260,13 +302,12 @@
             .then(r => r.json())
             .then(function (data) {
                 if (data.ok && data.seconds_left) {
-                    card._secondsLeft = data.seconds_left;
                     // Update displayed end time
                     const newEndDate = new Date(Date.now() + data.seconds_left * 1000);
                     const hh = String(newEndDate.getHours()).padStart(2, '0');
                     const mm = String(newEndDate.getMinutes()).padStart(2, '0');
                     card.querySelector('.card-end-time').textContent = hh + ':' + mm;
-                    resumeCountdown(card);
+                    resumeCountdown(card, data.seconds_left);
                     resumeBtn.style.display = 'none';
                     pauseBtn.style.display = 'inline-block';
                     statusBadge.textContent = 'Playing';
@@ -315,36 +356,45 @@
         });
     }
 
-    // --- Audio: create AudioContext immediately, keep alive with silent oscillator ---
-    var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    // Try to resume + start silent oscillator to keep audio pipeline active
-    audioCtx.resume().then(function () {
-        var osc = audioCtx.createOscillator();
-        var gain = audioCtx.createGain();
-        gain.gain.value = 0; // completely silent
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-    }).catch(function () {});
+    // --- Audio + Notification setup ---
+    // Request notification permission on page load (needed for sound without interaction)
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
 
-    // Also unlock on any user gesture as fallback
-    ['click', 'keydown', 'touchstart'].forEach(function (evt) {
-        document.addEventListener(evt, function () {
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume().then(function () {
-                    var osc = audioCtx.createOscillator();
-                    var gain = audioCtx.createGain();
-                    gain.gain.value = 0;
-                    osc.connect(gain);
-                    gain.connect(audioCtx.destination);
-                    osc.start();
-                }).catch(function () {});
-            }
-        }, { once: true });
+    // AudioContext for beep (works when user has interacted with page)
+    var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    audioCtx.resume().catch(function () {});
+    document.addEventListener('click', function () {
+        if (audioCtx.state === 'suspended') { audioCtx.resume().catch(function () {}); }
     });
 
+    function doOscBeep() {
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.2);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 1.2);
+    }
+
     function playBeep() {
-        // 1. Flash page title
+        // 1. System notification — plays OS notification sound even without page interaction
+        if ('Notification' in window && Notification.permission === 'granted') {
+            var n = new Notification('Session Complete', {
+                body: 'A play session has finished!',
+                icon: '/static/favicon.ico',
+                requireInteraction: false,
+            });
+            // Auto-close after 8 seconds
+            setTimeout(function () { n.close(); }, 8000);
+        }
+
+        // 2. Flash page title
         var originalTitle = document.title;
         var flashCount = 0;
         var flashInterval = setInterval(function () {
@@ -356,20 +406,10 @@
             }
         }, 500);
 
-        // 2. Play beep sound
-        try {
-            if (audioCtx.state === 'suspended') { audioCtx.resume(); }
-            var osc = audioCtx.createOscillator();
-            var gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.type = 'sine';
-            osc.frequency.value = 880;
-            gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.2);
-            osc.start(audioCtx.currentTime);
-            osc.stop(audioCtx.currentTime + 1.2);
-        } catch (e) {}
+        // 3. AudioContext beep (works if user has clicked on page before)
+        audioCtx.resume().then(function () {
+            doOscBeep();
+        }).catch(function () {});
     }
 
     function restoreActiveSessions() {
@@ -414,7 +454,8 @@ data.sessions.forEach(function (s) {
             card.querySelector('.card-pause-btn').style.display = 'none';
             card.querySelector('.card-resume-btn').style.display = 'inline-block';
             // Don't start countdown yet - user must resume
-            card._secondsLeft = secondsLeft;
+            card._pausedSecondsLeft = secondsLeft;
+            card._paused = true;
             card._onDone = function () {
                 finishSession(card, sessionId, account.id);
             };
