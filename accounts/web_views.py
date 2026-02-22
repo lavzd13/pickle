@@ -41,7 +41,7 @@ def calculate_play_info(account):
     except PlayInfo.DoesNotExist:
         play_info = PlayInfo.objects.create(
             account=account,
-            play_days_per_week=gaussian_sample(2, 7, 4),
+            play_days_per_week=gaussian_sample(2, 7, 5.2),
             holiday_days_per_year=gaussian_sample(10, 35, 17),
             hours_per_day=gaussian_sample(2, 10, 4.5)
         )
@@ -611,7 +611,7 @@ def eligible_account(request):
         PlaySession.objects.filter(session_date=today, is_active=True).values_list('account_id', flat=True)
     )
 
-    # Client-side excluded IDs (pending cards not yet started)
+    # Client-side excluded IDs (pending cards not yet started on this tab)
     excluded_param = request.GET.get('excluded', '')
     client_excluded = set()
     if excluded_param:
@@ -621,7 +621,20 @@ def eligible_account(request):
             except ValueError:
                 pass
 
-    excluded_ids = active_ids | client_excluded
+    # Server-side pending sessions (survive page reload, cross-tab awareness)
+    now_utc = timezone.now()
+    now_ts = now_utc.timestamp()
+    raw_pending = request.session.get('pending_sessions', {})
+    live_pending = {}
+    for aid_str, ps in raw_pending.items():
+        if ps.get('expires_at', 0) > now_ts:
+            live_pending[aid_str] = ps
+    if len(live_pending) != len(raw_pending):
+        request.session['pending_sessions'] = live_pending
+        request.session.modified = True
+
+    pending_ids = {int(k) for k in live_pending}
+    excluded_ids = active_ids | client_excluded | pending_ids
 
     # Total minutes already played today per account (completed + active sessions)
     from datetime import datetime as _dt
@@ -660,20 +673,33 @@ def eligible_account(request):
     acc, remaining_minutes = random.choice(eligible)
     max_duration = min(150, int(remaining_minutes))
     target_median = min(75, (20 + max_duration) / 2)  # Use midpoint when max < 75
-    duration_minutes = round(gaussian_sample(1, 1, 1))
+    duration_minutes = round(gaussian_sample(20, max_duration, target_median))
+
+    account_data = {
+        'id': acc.id,
+        'nick': acc.nick,
+        'platform': str(acc.platform) if acc.platform else '',
+        'phone': acc.phone or '',
+        'withdraw_pass': acc.payment.withdraw_pass if hasattr(acc, 'payment') else '',
+        'min_balance': str(acc.payment.min_balance) if hasattr(acc, 'payment') else '0.00',
+    }
+
+    # Persist pending session so it survives page reloads (expires in 10 min)
+    live_pending[str(acc.id)] = {
+        'account': account_data,
+        'duration_minutes': duration_minutes,
+        'remaining_minutes': round(remaining_minutes),
+        'expires_at': (now_utc + timedelta(minutes=10)).timestamp(),
+    }
+    request.session['pending_sessions'] = live_pending
+    request.session.modified = True
 
     return JsonResponse({
         'eligible': True,
-        'account': {
-            'id': acc.id,
-            'nick': acc.nick,
-            'platform': str(acc.platform) if acc.platform else '',
-            'phone': acc.phone or '',
-            'withdraw_pass': acc.payment.withdraw_pass if hasattr(acc, 'payment') else '',
-            'min_balance': str(acc.payment.min_balance) if hasattr(acc, 'payment') else '0.00',
-        },
+        'account': account_data,
         'remaining_minutes': round(remaining_minutes),
         'duration_minutes': duration_minutes,
+        'expires_in_seconds': 600,
     })
 
 
@@ -704,6 +730,13 @@ def start_session_play(request):
         created_by=request.user,
         is_active=True,
     )
+
+    # Remove from pending (session is now active)
+    pending = request.session.get('pending_sessions', {})
+    if str(account_id) in pending:
+        del pending[str(account_id)]
+        request.session['pending_sessions'] = pending
+        request.session.modified = True
 
     return JsonResponse({
         'session_id': session.id,
@@ -758,7 +791,26 @@ def active_sessions(request):
                 'min_balance': str(acc.payment.min_balance) if hasattr(acc, 'payment') else '0.00',
             },
         })
-    return JsonResponse({'sessions': result})
+    # Also return server-side pending sessions (not yet started)
+    now_ts2 = now_local.timestamp()
+    raw_pending = request.session.get('pending_sessions', {})
+    pending_result = []
+    live_pending2 = {}
+    for aid_str, ps in raw_pending.items():
+        if ps.get('expires_at', 0) > now_ts2:
+            expires_in = int(ps['expires_at'] - now_ts2)
+            pending_result.append({
+                'account': ps['account'],
+                'duration_minutes': ps['duration_minutes'],
+                'remaining_minutes': ps['remaining_minutes'],
+                'expires_in_seconds': expires_in,
+            })
+            live_pending2[aid_str] = ps
+    if len(live_pending2) != len(raw_pending):
+        request.session['pending_sessions'] = live_pending2
+        request.session.modified = True
+
+    return JsonResponse({'sessions': result, 'pending': pending_result})
 
 
 @login_required
