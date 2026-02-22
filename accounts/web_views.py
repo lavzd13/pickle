@@ -11,7 +11,7 @@ from django.utils import timezone
 from .models import PlaySession, AccountDetail, Payment, Location, Security, LastTransaction, PlayInfo, DepositWithdrawal
 from django.db.models import Sum
 from django.forms import modelformset_factory
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from .forms import PlaySessionForm, DaySessionForm, AccountDetailForm, PaymentForm, UserCreateForm, UserEditForm, PlatformForm, LocationForm, SecurityForm, LastTransactionForm
 
 
@@ -660,7 +660,7 @@ def eligible_account(request):
     acc, remaining_minutes = random.choice(eligible)
     max_duration = min(150, int(remaining_minutes))
     target_median = min(75, (20 + max_duration) / 2)  # Use midpoint when max < 75
-    duration_minutes = round(gaussian_sample(20, max_duration, target_median))
+    duration_minutes = round(gaussian_sample(1, 1, 1))
 
     return JsonResponse({
         'eligible': True,
@@ -982,3 +982,35 @@ def deposit_withdrawal_history(request):
             'withdrawals': str(totals['total_withdrawals'] or 0),
         }
     })
+
+
+def service_worker_js(request):
+    js = """
+self.addEventListener('notificationclick', function(event) {
+    event.notification.close();
+    event.waitUntil(
+        clients.matchAll({ type: 'window' }).then(function(clientList) {
+            for (var i = 0; i < clientList.length; i++) {
+                if (clientList[i].url.indexOf('/play') !== -1 && 'focus' in clientList[i]) {
+                    return clientList[i].focus();
+                }
+            }
+            if (clients.openWindow) {
+                return clients.openWindow('/play/');
+            }
+        })
+    );
+});
+
+self.addEventListener('message', function(event) {
+    if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
+        self.registration.showNotification(event.data.title || 'Session Complete', {
+            body: event.data.body || 'A play session has finished!',
+            icon: '/static/favicon.ico',
+            requireInteraction: true,
+            tag: 'session-done-' + (event.data.tag || Date.now()),
+        });
+    }
+});
+"""
+    return HttpResponse(js, content_type='application/javascript')
