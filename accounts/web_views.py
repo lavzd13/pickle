@@ -606,7 +606,7 @@ def eligible_account(request):
     # Auto-expire active sessions whose end_time has already passed
     now_time = now_local.time()
     PlaySession.objects.filter(
-        session_date=today, is_active=True, end_time__lte=now_time
+        session_date=today, is_active=True, is_done=False, end_time__lte=now_time
     ).update(is_active=False)
 
     # Delete stale pending sessions from previous days
@@ -666,7 +666,7 @@ def eligible_account(request):
     acc, remaining_minutes = random.choice(eligible)
     max_duration = min(150, int(remaining_minutes))
     target_median = min(75, (20 + max_duration) / 2)
-    duration_minutes = round(gaussian_sample(20, max_duration, target_median))
+    duration_minutes = round(gaussian_sample(1, 1, 1))
 
     account_data = {
         'id': acc.id,
@@ -724,8 +724,7 @@ def start_session_play(request):
     session.is_pending = False
     session.start_time = start_time
     session.end_time = end_time
-    session.notes = ''
-    session.save(update_fields=['is_pending', 'start_time', 'end_time', 'notes'])
+    session.save(update_fields=['is_pending', 'start_time', 'end_time'])
 
     return JsonResponse({
         'session_id': session.id,
@@ -747,7 +746,8 @@ def active_sessions(request):
         base_qs = base_qs.filter(created_by=request.user)
     base_qs = base_qs.select_related('account', 'account__payment')
 
-    playing_qs = base_qs.filter(is_pending=False)
+    playing_qs = base_qs.filter(is_pending=False, is_done=False)
+    done_qs = base_qs.filter(is_pending=False, is_done=True)
     pending_qs = base_qs.filter(is_pending=True)
 
     result = []
@@ -766,11 +766,17 @@ def active_sessions(request):
         timed_out = seconds_left <= 0
         if timed_out:
             seconds_left = 0
+        try:
+            meta = _json.loads(s.notes or '{}')
+            remaining_after = max(0, int(meta.get('r', 0)) - int(meta.get('d', 0)))
+        except Exception:
+            remaining_after = 0
         acc = s.account
         result.append({
             'session_id': s.id,
             'seconds_left': seconds_left,
             'timed_out': timed_out,
+            'remaining_after': remaining_after,
             'end_time': s.end_time.strftime('%H:%M'),
             'paused': s.paused,
             'created_by': s.created_by.username if s.created_by else None,
@@ -784,9 +790,37 @@ def active_sessions(request):
             },
         })
 
+    done_result = []
+    for s in done_qs:
+        try:
+            meta = _json.loads(s.notes or '{}')
+            r = int(meta.get('r', 0))
+        except Exception:
+            r = 0
+        start_dt = _dt.combine(today, s.start_time)
+        end_dt = _dt.combine(today, s.end_time)
+        if end_dt < start_dt:
+            end_dt += timedelta(days=1)
+        actual_minutes = int((end_dt - start_dt).total_seconds() / 60)
+        remaining_after = max(0, r - actual_minutes)
+        acc = s.account
+        done_result.append({
+            'session_id': s.id,
+            'remaining_after': remaining_after,
+            'created_by': s.created_by.username if s.created_by else None,
+            'account': {
+                'id': acc.id,
+                'nick': acc.nick,
+                'platform': str(acc.platform) if acc.platform else '',
+                'phone': acc.phone or '',
+                'withdraw_pass': acc.payment.withdraw_pass if hasattr(acc, 'payment') else '',
+                'min_balance': str(acc.payment.min_balance) if hasattr(acc, 'payment') else '0.00',
+            },
+        })
+
     # Superusers monitor all playing sessions; they don't interact with pending sessions
     if request.user.is_superuser:
-        return JsonResponse({'sessions': result, 'pending': []})
+        return JsonResponse({'sessions': result, 'done': done_result, 'pending': []})
 
     pending_result = []
     for s in pending_qs:
@@ -818,7 +852,7 @@ def active_sessions(request):
             },
         })
 
-    return JsonResponse({'sessions': result, 'pending': pending_result})
+    return JsonResponse({'sessions': result, 'done': done_result, 'pending': pending_result})
 
 
 @login_required
@@ -832,6 +866,20 @@ def cancel_pending_session(request):
     session_id = data.get('session_id')
 
     PlaySession.objects.filter(pk=session_id, is_pending=True, created_by=request.user).delete()
+    return JsonResponse({'ok': True})
+
+
+@login_required
+def dismiss_session(request):
+    """Mark a done session as inactive so it leaves the play page."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    import json
+    data = json.loads(request.body)
+    session_id = data.get('session_id')
+
+    PlaySession.objects.filter(pk=session_id, is_done=True, created_by=request.user).update(is_active=False)
     return JsonResponse({'ok': True})
 
 
@@ -923,14 +971,31 @@ def stop_session(request):
 
     session = get_object_or_404(PlaySession, pk=session_id)
 
-    # Set end_time to now (actual time played, not the scheduled end_time)
+    import json as _json
+    from datetime import datetime as _dt
     now_local = timezone.localtime()
-    session.end_time = now_local.time().replace(microsecond=0)
-    session.is_active = False
-    session.paused = False  # Clear pause state if paused
-    session.save(update_fields=['end_time', 'is_active', 'paused'])
+    today = timezone.localdate()
+    actual_stop_time = now_local.time().replace(microsecond=0)
 
-    return JsonResponse({'ok': True})
+    start_dt = _dt.combine(today, session.start_time)
+    stop_dt = _dt.combine(today, actual_stop_time)
+    if stop_dt < start_dt:
+        stop_dt += timedelta(days=1)
+    actual_minutes = int((stop_dt - start_dt).total_seconds() / 60)
+
+    try:
+        meta = _json.loads(session.notes or '{}')
+        r = int(meta.get('r', 0))
+    except Exception:
+        r = 0
+    remaining_after = max(0, r - actual_minutes)
+
+    session.end_time = actual_stop_time
+    session.is_done = True
+    session.paused = False
+    session.save(update_fields=['end_time', 'is_done', 'paused'])
+
+    return JsonResponse({'ok': True, 'remaining_after': remaining_after})
 
 
 @login_required

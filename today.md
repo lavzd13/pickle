@@ -3,6 +3,11 @@ Regarding sound, SOUND MUST BE ENABLED IN THE BROWSER BECAUSE THAT IS FUCKING HI
 !!! SOUND WORKS NOW !!!
 
 TODO:
+- !!! OFF TIME (0, 30, 10)
+- REMAINING TIME DISPLAYED EVERYWHERE
+- NOTIFICATION THAT SESSION IS LAST
+- SESSION SHOULD NOT DISAPPEAR AFTER 10sec. THERE SHOULD BE BUTTON DONE to click on it
+- Session list need update (all info should be displayed for stop session card)
 - Creation date of the pokerclans account field (date when it was registered in app)
 - Add network option for payment table
 - Put default value for withdrawal balance to be 1600. Also change the name of it, make smth better
@@ -11,6 +16,7 @@ TODO:
 - Make nickname of the account in the account list able to be copy/pasted.
 - Add copy buttons next to all info inside of account list/info
 - Withdrawal balance
+
 
 
 
