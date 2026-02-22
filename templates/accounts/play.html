@@ -42,6 +42,7 @@
             <div class="card-pending-section">
                 <p class="text-muted mb-1">Duration: <strong class="card-duration"></strong> min</p>
                 <p class="text-muted mb-2" style="font-size:0.85rem;">Remaining today: <strong class="card-remaining"></strong> min</p>
+                <p class="text-warning mb-2" style="font-size:0.8rem;"><i class="bi bi-clock"></i> Expires in <span class="card-pending-expire-time">10:00</span></p>
                 <button class="btn btn-success card-start-btn" style="font-size:1.1rem; padding: 0.5rem 1.5rem;">
                     <i class="bi bi-play-fill"></i> Start Session
                 </button>
@@ -84,7 +85,40 @@
 (function () {
     // Track account IDs currently displayed (pending or running)
     var displayedAccountIds = new Set();
-    var sessionCount = 0;
+
+    function updatePlayButton() {
+        var count = document.querySelectorAll('#session-list .session-card').length;
+        var btn = document.getElementById('btn-play');
+        if (count === 0) {
+            btn.innerHTML = 'PLAY';
+            btn.classList.remove('btn-outline-primary');
+            btn.classList.add('btn-primary');
+            btn.style.fontSize = '2rem';
+            btn.style.padding = '1.2rem 3rem';
+        } else {
+            btn.innerHTML = '<i class="bi bi-plus-circle"></i> Add One More Session';
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-outline-primary');
+            btn.style.fontSize = '1rem';
+            btn.style.padding = '0.5rem 1.5rem';
+        }
+    }
+
+    function startPendingCountdown(card, expiresAtMs) {
+        var expireEl = card.querySelector('.card-pending-expire-time');
+        card._pendingInterval = setInterval(function () {
+            var left = Math.max(0, Math.round((expiresAtMs - Date.now()) / 1000));
+            var m = Math.floor(left / 60);
+            var s = left % 60;
+            expireEl.textContent = m + ':' + String(s).padStart(2, '0');
+            if (left <= 0) {
+                clearInterval(card._pendingInterval);
+                displayedAccountIds.delete(parseInt(card.dataset.accountId));
+                card.remove();
+                updatePlayButton();
+            }
+        }, 1000);
+    }
 
     function getCsrf() {
         return document.cookie.split(';').map(c => c.trim())
@@ -115,7 +149,7 @@
             .catch(showNoAccounts);
     }
 
-    function addSessionCard(account, durationMinutes, remainingMinutes) {
+    function addSessionCard(account, durationMinutes, remainingMinutes, expiresAtMs) {
         displayedAccountIds.add(account.id);
 
         var tpl = document.getElementById('session-card-tpl');
@@ -131,22 +165,28 @@
         card.querySelector('.card-duration').textContent = durationMinutes;
         card.querySelector('.card-remaining').textContent = remainingMinutes;
 
+        // Start pending expiry countdown (10 min from now, or server-provided)
+        startPendingCountdown(card, expiresAtMs || (Date.now() + 10 * 60 * 1000));
+
         // Quit button
         card.querySelector('.card-quit-btn').addEventListener('click', function () {
+            clearInterval(card._pendingInterval);
             displayedAccountIds.delete(account.id);
             if (sessionId) {
                 fetch('/play/finish-session/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
                     body: JSON.stringify({ session_id: sessionId }),
-                }).finally(function () { card.remove(); });
+                }).finally(function () { card.remove(); updatePlayButton(); });
             } else {
                 card.remove();
+                updatePlayButton();
             }
         });
 
         // Start button
         card.querySelector('.card-start-btn').addEventListener('click', function () {
+            clearInterval(card._pendingInterval);
             card.querySelector('.card-start-btn').disabled = true;
             card.querySelector('.card-status').textContent = 'Starting...';
 
@@ -162,6 +202,7 @@
                 card.querySelector('.card-running-section').style.display = 'block';
                 card.querySelector('.card-status').textContent = 'Playing';
                 card.querySelector('.card-status').className = 'badge bg-success card-status';
+                card.querySelector('.card-quit-btn').style.display = 'none';
                 card.style.backgroundColor = '#d1f5d3';
                 card.style.borderColor = '#6dbb74';
                 const endDate = new Date(Date.now() + durationMinutes * 60000);
@@ -176,15 +217,7 @@
         });
 
         document.getElementById('session-list').prepend(card);
-        sessionCount++;
-
-        if (sessionCount === 1) {
-            var btn = document.getElementById('btn-play');
-            btn.innerHTML = '<i class="bi bi-plus-circle"></i> Add One More Session';
-            btn.classList.replace('btn-primary', 'btn-outline-primary');
-            btn.style.fontSize = '1rem';
-            btn.style.padding = '0.5rem 1.5rem';
-        }
+        updatePlayButton();
     }
 
     // --- Web Worker timer (NOT throttled in background tabs) ---
@@ -519,8 +552,11 @@
             })
             .then(function (data) {
                 if (!data) return;
-data.sessions.forEach(function (s) {
+                data.sessions.forEach(function (s) {
                     restoreSessionCard(s.account, s.session_id, s.seconds_left, s.end_time, s.paused);
+                });
+                (data.pending || []).forEach(function (p) {
+                    addSessionCard(p.account, p.duration_minutes, p.remaining_minutes, Date.now() + p.expires_in_seconds * 1000);
                 });
             })
             .catch(function (e) { console.error('active-sessions fetch error', e); });
@@ -561,6 +597,7 @@ data.sessions.forEach(function (s) {
         } else {
             card.querySelector('.card-status').textContent = 'Playing';
             card.querySelector('.card-status').className = 'badge bg-success card-status';
+            card.querySelector('.card-quit-btn').style.display = 'none';
             startCountdown(card, secondsLeft, function () {
                 onTimerExpired(card);
             });
@@ -578,15 +615,7 @@ data.sessions.forEach(function (s) {
         setupPauseResume(card, sessionId, account.id);
 
         document.getElementById('session-list').prepend(card);
-        sessionCount++;
-
-        if (sessionCount === 1) {
-            var btn = document.getElementById('btn-play');
-            btn.innerHTML = '<i class="bi bi-plus-circle"></i> Add One More Session';
-            btn.classList.replace('btn-primary', 'btn-outline-primary');
-            btn.style.fontSize = '1rem';
-            btn.style.padding = '0.5rem 1.5rem';
-        }
+        updatePlayButton();
     }
 
     restoreActiveSessions();
