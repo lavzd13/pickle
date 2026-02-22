@@ -46,4 +46,7 @@ urlpatterns = [
     path('deposit-withdrawal/reports/', web_views.deposit_withdrawal_reports, name='deposit_withdrawal_reports'),
     path('deposit-withdrawal/history/', web_views.deposit_withdrawal_history, name='deposit_withdrawal_history'),
     path('account-search/', web_views.account_search, name='account_search'),
+
+    # Service Worker (must be at root for full scope)
+    path('sw.js', web_views.service_worker_js, name='service_worker_js'),
 ]

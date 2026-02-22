@@ -63,6 +63,14 @@
                     </button>
                 </div>
             </div>
+            <div class="card-timeup-section mt-2" style="display:none;">
+                <div class="alert alert-warning d-flex align-items-center justify-content-between mb-2 py-2">
+                    <span><i class="bi bi-alarm-fill"></i> <strong>Time's up!</strong> Click Stop when you're done.</span>
+                </div>
+                <button class="btn btn-danger card-timeup-stop-btn w-100">
+                    <i class="bi bi-stop-fill"></i> Stop Session
+                </button>
+            </div>
             <div class="card-done-section alert alert-success mb-0 mt-2" style="display:none;">
                 <i class="bi bi-check-circle-fill"></i> Session complete!
             </div>
@@ -161,7 +169,7 @@
                 const mm = String(endDate.getMinutes()).padStart(2, '0');
                 card.querySelector('.card-end-time').textContent = hh + ':' + mm;
                 startCountdown(card, durationMinutes * 60, function () {
-                    finishSession(card, sessionId, account.id);
+                    onTimerExpired(card);
                 });
                 setupPauseResume(card, sessionId, account.id);
             });
@@ -179,86 +187,107 @@
         }
     }
 
-    // --- Timestamp-based countdown (immune to background throttling) ---
-    // All running cards tracked here so visibilitychange can re-tick them
+    // --- Web Worker timer (NOT throttled in background tabs) ---
+    var workerBlob = new Blob([
+        'var timers = {};',
+        'setInterval(function() {',
+        '  var now = Date.now();',
+        '  for (var id in timers) {',
+        '    if (timers[id].paused) continue;',
+        '    var left = Math.round((timers[id].end - now) / 1000);',
+        '    if (left <= 0) {',
+        '      postMessage({ type: "done", id: id });',
+        '      delete timers[id];',
+        '    } else {',
+        '      postMessage({ type: "tick", id: id, remaining: left });',
+        '    }',
+        '  }',
+        '}, 1000);',
+        'onmessage = function(e) {',
+        '  var d = e.data;',
+        '  if (d.cmd === "start") timers[d.id] = { end: d.endTimestamp, paused: false };',
+        '  if (d.cmd === "pause") { if (timers[d.id]) timers[d.id].paused = true; }',
+        '  if (d.cmd === "resume") { if (timers[d.id]) { timers[d.id].end = d.endTimestamp; timers[d.id].paused = false; } }',
+        '  if (d.cmd === "stop") delete timers[d.id];',
+        '};'
+    ], { type: 'application/javascript' });
+    var timerWorker = new Worker(URL.createObjectURL(workerBlob));
+
+    // Map timer IDs to card elements
+    var cardById = {};
+    var nextTimerId = 1;
+
+    timerWorker.onmessage = function (e) {
+        var d = e.data;
+        var card = cardById[d.id];
+        if (!card || card._done) return;
+        if (d.type === 'tick') {
+            var timerEl = card.querySelector('.card-timer');
+            var m = Math.floor(d.remaining / 60);
+            var s = d.remaining % 60;
+            timerEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+        } else if (d.type === 'done') {
+            triggerDone(card);
+        }
+    };
+
     var runningCards = new Set();
+
+    function triggerDone(card) {
+        if (card._done) return;
+        card._done = true;
+        runningCards.delete(card);
+        var timerEl = card.querySelector('.card-timer');
+        timerEl.textContent = '00:00';
+        card._onDone();
+    }
 
     function startCountdown(card, totalSeconds, onDone) {
         var timerEl = card.querySelector('.card-timer');
+        var timerId = String(nextTimerId++);
+        card._timerId = timerId;
         card._endTimestamp = Date.now() + totalSeconds * 1000;
         card._onDone = onDone;
         card._paused = false;
+        card._done = false;
+        cardById[timerId] = card;
         runningCards.add(card);
 
-        function tick() {
-            if (card._paused) return;
-            var remaining = Math.round((card._endTimestamp - Date.now()) / 1000);
-            if (remaining <= 0) {
-                clearInterval(card._interval);
-                card._interval = null;
-                runningCards.delete(card);
-                timerEl.textContent = '00:00';
-                onDone();
-                return;
-            }
-            var m = Math.floor(remaining / 60);
-            var s = remaining % 60;
-            timerEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
-        }
-        tick();
-        card._interval = setInterval(tick, 1000);
+        // Display immediately
+        var m = Math.floor(totalSeconds / 60);
+        var s = totalSeconds % 60;
+        timerEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+
+        // Start worker timer (runs in separate thread, NOT throttled)
+        timerWorker.postMessage({ cmd: 'start', id: timerId, endTimestamp: card._endTimestamp });
     }
 
     function pauseCountdown(card) {
         card._paused = true;
-        // Save how many seconds were left at pause time
         card._pausedSecondsLeft = Math.max(0, Math.round((card._endTimestamp - Date.now()) / 1000));
-        if (card._interval) {
-            clearInterval(card._interval);
-            card._interval = null;
-        }
         runningCards.delete(card);
+        timerWorker.postMessage({ cmd: 'pause', id: card._timerId });
     }
 
     function resumeCountdown(card, secondsLeft) {
-        var timerEl = card.querySelector('.card-timer');
         var secs = secondsLeft != null ? secondsLeft : card._pausedSecondsLeft;
         card._endTimestamp = Date.now() + secs * 1000;
         card._paused = false;
+        card._done = false;
         runningCards.add(card);
-
-        function tick() {
-            if (card._paused) return;
-            var remaining = Math.round((card._endTimestamp - Date.now()) / 1000);
-            if (remaining <= 0) {
-                clearInterval(card._interval);
-                card._interval = null;
-                runningCards.delete(card);
-                timerEl.textContent = '00:00';
-                card._onDone();
-                return;
-            }
-            var m = Math.floor(remaining / 60);
-            var s = remaining % 60;
-            timerEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
-        }
-        tick();
-        card._interval = setInterval(tick, 1000);
+        timerWorker.postMessage({ cmd: 'resume', id: card._timerId, endTimestamp: card._endTimestamp });
     }
 
-    // When tab becomes visible again, immediately re-tick all running cards
+    // When tab becomes visible, immediately update display for all running cards
     document.addEventListener('visibilitychange', function () {
         if (!document.hidden) {
             runningCards.forEach(function (card) {
-                var timerEl = card.querySelector('.card-timer');
+                if (card._done) return;
                 var remaining = Math.round((card._endTimestamp - Date.now()) / 1000);
                 if (remaining <= 0) {
-                    clearInterval(card._interval);
-                    card._interval = null;
-                    runningCards.delete(card);
-                    timerEl.textContent = '00:00';
-                    card._onDone();
+                    triggerDone(card);
                 } else {
+                    var timerEl = card.querySelector('.card-timer');
                     var m = Math.floor(remaining / 60);
                     var s = remaining % 60;
                     timerEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
@@ -317,13 +346,14 @@
             });
         });
 
+        // Early stop (while timer is still running) — ask for confirmation
         var stopBtn = card.querySelector('.card-stop-btn');
         stopBtn.addEventListener('click', function () {
             if (!confirm('Stop this session early? The actual time played will be saved.')) {
                 return;
             }
             stopBtn.disabled = true;
-            pauseCountdown(card);  // Stop the timer
+            pauseCountdown(card);
             fetch('/play/stop-session/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
@@ -332,13 +362,41 @@
             .then(r => r.json())
             .then(function (data) {
                 if (data.ok) {
-                    finishSession(card, sessionId, accountId);
+                    doFinishSession(card, sessionId, accountId);
+                }
+            });
+        });
+
+        // Time's up stop button — no confirmation needed, records actual stop time
+        var timeupStopBtn = card.querySelector('.card-timeup-stop-btn');
+        timeupStopBtn.addEventListener('click', function () {
+            timeupStopBtn.disabled = true;
+            fetch('/play/stop-session/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                body: JSON.stringify({ session_id: sessionId }),
+            })
+            .then(r => r.json())
+            .then(function (data) {
+                if (data.ok) {
+                    doFinishSession(card, sessionId, accountId);
                 }
             });
         });
     }
 
-    function finishSession(card, sessionId, accountId) {
+    // Called when timer hits 0 — play beep, show "time's up" UI, wait for user to click Stop
+    function onTimerExpired(card) {
+        playBeep();
+        card.querySelector('.card-running-section').style.display = 'none';
+        card.querySelector('.card-timeup-section').style.display = 'block';
+        card.querySelector('.card-status').textContent = "Time's up!";
+        card.querySelector('.card-status').className = 'badge bg-danger card-status';
+        card.querySelector('.card-quit-btn').style.display = 'none';
+    }
+
+    // Called after stop-session API succeeds — marks session done and removes card
+    function doFinishSession(card, sessionId, accountId) {
         fetch('/play/finish-session/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
@@ -347,26 +405,71 @@
         .then(function () {
             displayedAccountIds.delete(accountId);
             card.querySelector('.card-running-section').style.display = 'none';
+            card.querySelector('.card-timeup-section').style.display = 'none';
             card.querySelector('.card-done-section').style.display = 'block';
             card.querySelector('.card-status').textContent = 'Done';
             card.querySelector('.card-status').className = 'badge bg-secondary card-status';
             card.querySelector('.card-quit-btn').style.display = 'none';
-            playBeep();
-            setTimeout(function () { card.remove(); }, 10000);
+            setTimeout(function () { card.remove(); }, 3000);
         });
     }
 
-    // --- Audio + Notification setup ---
-    // Request notification permission on page load (needed for sound without interaction)
+    // --- Service Worker registration ---
+    var swRegistration = null;
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').then(function (reg) {
+            swRegistration = reg;
+        }).catch(function (err) {
+            console.warn('SW registration failed:', err);
+        });
+    }
+
+    // Request notification permission on page load
     if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
     }
 
-    // AudioContext for beep (works when user has interacted with page)
+    // --- Audio: silent loop keeps AudioContext alive (Spotify trick) ---
+    // Build a tiny silent WAV (1 second, 8kHz mono, all zeros)
+    function buildSilentWav() {
+        var sr = 8000, n = sr;
+        var buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+        function ws(o, s) { for (var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); }
+        ws(0,'RIFF'); v.setUint32(4,36+n*2,true); ws(8,'WAVE'); ws(12,'fmt ');
+        v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+        v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true);
+        v.setUint16(34,16,true); ws(36,'data'); v.setUint32(40,n*2,true);
+        // all samples = 0 (silence)
+        return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+    }
+
+    var silentAudio = new Audio(buildSilentWav());
+    silentAudio.loop = true;
+    // volume = 1.0 so the browser shows the speaker icon on the tab.
+    // The WAV data is all zeros, so no actual sound comes out.
+    silentAudio.volume = 1.0;
+
     var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    audioCtx.resume().catch(function () {});
-    document.addEventListener('click', function () {
-        if (audioCtx.state === 'suspended') { audioCtx.resume().catch(function () {}); }
+    var audioUnlocked = false;
+
+    function unlockAudio() {
+        if (audioUnlocked) return;
+        silentAudio.play().then(function () {
+            audioUnlocked = true;
+        }).catch(function () {});
+        audioCtx.resume().catch(function () {});
+    }
+
+    // If the browser ever pauses the silent loop, restart it
+    silentAudio.addEventListener('pause', function () {
+        if (audioUnlocked) {
+            silentAudio.play().catch(function () {});
+        }
+    });
+
+    // Unlock on any interaction — retries on every event until silentAudio.play() succeeds
+    ['click', 'keydown', 'touchstart'].forEach(function (evt) {
+        document.addEventListener(evt, unlockAudio);
     });
 
     function doOscBeep() {
@@ -376,22 +479,21 @@
         gain.connect(audioCtx.destination);
         osc.type = 'sine';
         osc.frequency.value = 880;
-        gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.2);
+        gain.gain.setValueAtTime(0.6, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.5);
         osc.start(audioCtx.currentTime);
-        osc.stop(audioCtx.currentTime + 1.2);
+        osc.stop(audioCtx.currentTime + 1.5);
     }
 
     function playBeep() {
-        // 1. System notification — plays OS notification sound even without page interaction
-        if ('Notification' in window && Notification.permission === 'granted') {
-            var n = new Notification('Session Complete', {
+        // 1. Service Worker notification — OS-level, works even when browser is minimized
+        if (swRegistration && 'Notification' in window && Notification.permission === 'granted') {
+            swRegistration.showNotification('Session Complete', {
                 body: 'A play session has finished!',
                 icon: '/static/favicon.ico',
-                requireInteraction: false,
+                requireInteraction: true,
+                tag: 'session-done-' + Date.now(),
             });
-            // Auto-close after 8 seconds
-            setTimeout(function () { n.close(); }, 8000);
         }
 
         // 2. Flash page title
@@ -400,13 +502,10 @@
         var flashInterval = setInterval(function () {
             document.title = (flashCount % 2 === 0) ? 'SESSION DONE!' : originalTitle;
             flashCount++;
-            if (flashCount > 20) {
-                clearInterval(flashInterval);
-                document.title = originalTitle;
-            }
+            if (flashCount > 20) { clearInterval(flashInterval); document.title = originalTitle; }
         }, 500);
 
-        // 3. AudioContext beep (works if user has clicked on page before)
+        // 3. AudioContext beep — works because silent loop keeps the context alive
         audioCtx.resume().then(function () {
             doOscBeep();
         }).catch(function () {});
@@ -457,13 +556,13 @@ data.sessions.forEach(function (s) {
             card._pausedSecondsLeft = secondsLeft;
             card._paused = true;
             card._onDone = function () {
-                finishSession(card, sessionId, account.id);
+                onTimerExpired(card);
             };
         } else {
             card.querySelector('.card-status').textContent = 'Playing';
             card.querySelector('.card-status').className = 'badge bg-success card-status';
             startCountdown(card, secondsLeft, function () {
-                finishSession(card, sessionId, account.id);
+                onTimerExpired(card);
             });
         }
 

@@ -1,3 +1,7 @@
+FIX THE ISSUE WITH SOUND (MAKE SILENT SOUND WHICH WILL CONSTANTLY PLAY IN THE BROWSER)
+Regarding sound, SOUND MUST BE ENABLED IN THE BROWSER BECAUSE THAT IS FUCKING HIM OVER
+
+
 1. Tracking of deposit/withdrawal
 6. JS timer latency when reloading page
 7. When session is added it should persist page reloads (when session is assigned to operator it can't disappear)
