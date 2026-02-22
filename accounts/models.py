@@ -214,6 +214,7 @@ class PlaySession(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     notes = models.TextField(blank=True, null=True)
     is_active = models.BooleanField(default=False)
+    is_pending = models.BooleanField(default=False)
     paused = models.BooleanField(default=False)
     pause_time = models.DateTimeField(null=True, blank=True)
 

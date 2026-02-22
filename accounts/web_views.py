@@ -595,23 +595,29 @@ def get_random_accounts(request):
 @login_required
 def eligible_account(request):
     """Return one random eligible account for today, plus a session duration."""
+    import json as _json
+    from datetime import datetime as _dt
     today = timezone.localdate()
     day_name = today.strftime('%A')
+    now_local = timezone.localtime()
 
     all_accounts = list(AccountDetail.objects.select_related('play_info', 'payment').all())
 
-    # Auto-expire sessions whose end_time has already passed (e.g. browser was closed)
-    now_time = timezone.localtime().time()
+    # Auto-expire active sessions whose end_time has already passed
+    now_time = now_local.time()
     PlaySession.objects.filter(
         session_date=today, is_active=True, end_time__lte=now_time
     ).update(is_active=False)
 
-    # Active session account IDs (currently playing)
+    # Delete stale pending sessions from previous days
+    PlaySession.objects.filter(is_pending=True, session_date__lt=today).delete()
+
+    # Active (playing or pending) account IDs — all excluded from selection
     active_ids = set(
         PlaySession.objects.filter(session_date=today, is_active=True).values_list('account_id', flat=True)
     )
 
-    # Client-side excluded IDs (pending cards not yet started on this tab)
+    # Client-side excluded IDs (extra safety for same-tab duplicate prevention)
     excluded_param = request.GET.get('excluded', '')
     client_excluded = set()
     if excluded_param:
@@ -621,25 +627,12 @@ def eligible_account(request):
             except ValueError:
                 pass
 
-    # Server-side pending sessions (survive page reload, cross-tab awareness)
-    now_utc = timezone.now()
-    now_ts = now_utc.timestamp()
-    raw_pending = request.session.get('pending_sessions', {})
-    live_pending = {}
-    for aid_str, ps in raw_pending.items():
-        if ps.get('expires_at', 0) > now_ts:
-            live_pending[aid_str] = ps
-    if len(live_pending) != len(raw_pending):
-        request.session['pending_sessions'] = live_pending
-        request.session.modified = True
+    excluded_ids = active_ids | client_excluded
 
-    pending_ids = {int(k) for k in live_pending}
-    excluded_ids = active_ids | client_excluded | pending_ids
-
-    # Total minutes already played today per account (completed + active sessions)
-    from datetime import datetime as _dt
+    # Total minutes already played today per account (non-pending sessions only)
     today_sessions = PlaySession.objects.filter(
         session_date=today,
+        is_pending=False,
         account__in=[a.id for a in all_accounts]
     )
     played_minutes = {}
@@ -672,7 +665,7 @@ def eligible_account(request):
 
     acc, remaining_minutes = random.choice(eligible)
     max_duration = min(150, int(remaining_minutes))
-    target_median = min(75, (20 + max_duration) / 2)  # Use midpoint when max < 75
+    target_median = min(75, (20 + max_duration) / 2)
     duration_minutes = round(gaussian_sample(20, max_duration, target_median))
 
     account_data = {
@@ -684,59 +677,55 @@ def eligible_account(request):
         'min_balance': str(acc.payment.min_balance) if hasattr(acc, 'payment') else '0.00',
     }
 
-    # Persist pending session so it survives page reloads (expires in 10 min)
-    live_pending[str(acc.id)] = {
-        'account': account_data,
-        'duration_minutes': duration_minutes,
-        'remaining_minutes': round(remaining_minutes),
-        'expires_at': (now_utc + timedelta(minutes=10)).timestamp(),
-    }
-    request.session['pending_sessions'] = live_pending
-    request.session.modified = True
+    # Create pending session in DB immediately — this is the cross-user lock.
+    # is_active=True means other users' eligible_account calls will exclude this account.
+    # is_pending=True distinguishes it from a real playing session.
+    # end_time = now + 20 min (the lock duration).
+    # notes stores duration + remaining so active_sessions can restore the pending card.
+    lock_end_time = (now_local + timedelta(minutes=20)).time()
+    session = PlaySession.objects.create(
+        account=acc,
+        session_date=today,
+        start_time=now_local.time(),
+        end_time=lock_end_time,
+        created_by=request.user,
+        is_active=True,
+        is_pending=True,
+        notes=_json.dumps({'d': duration_minutes, 'r': round(remaining_minutes)}),
+    )
 
     return JsonResponse({
         'eligible': True,
         'account': account_data,
         'remaining_minutes': round(remaining_minutes),
         'duration_minutes': duration_minutes,
-        'expires_in_seconds': 600,
+        'expires_in_seconds': 1200,
+        'session_id': session.id,
     })
 
 
 @login_required
 def start_session_play(request):
-    """Create a PlaySession for the given account and return session_id + end_time."""
+    """Activate a pending PlaySession — updates its times and clears the pending flag."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
     import json
     data = json.loads(request.body)
-    account_id = data.get('account_id')
+    session_id = data.get('session_id')
     duration_minutes = int(data.get('duration_minutes', 60))
 
-    account = get_object_or_404(AccountDetail, pk=account_id)
+    session = get_object_or_404(PlaySession, pk=session_id, is_pending=True, created_by=request.user)
 
     now_local = timezone.localtime()
-    today = now_local.date()
     start_time = now_local.time().replace(microsecond=0)
-    end_dt = now_local + timedelta(minutes=duration_minutes)
-    end_time = end_dt.time().replace(microsecond=0)
+    end_time = (now_local + timedelta(minutes=duration_minutes)).time().replace(microsecond=0)
 
-    session = PlaySession.objects.create(
-        account=account,
-        session_date=today,
-        start_time=start_time,
-        end_time=end_time,
-        created_by=request.user,
-        is_active=True,
-    )
-
-    # Remove from pending (session is now active)
-    pending = request.session.get('pending_sessions', {})
-    if str(account_id) in pending:
-        del pending[str(account_id)]
-        request.session['pending_sessions'] = pending
-        request.session.modified = True
+    session.is_pending = False
+    session.start_time = start_time
+    session.end_time = end_time
+    session.notes = ''
+    session.save(update_fields=['is_pending', 'start_time', 'end_time', 'notes'])
 
     return JsonResponse({
         'session_id': session.id,
@@ -747,41 +736,44 @@ def start_session_play(request):
 @login_required
 def active_sessions(request):
     """Return all currently active sessions for today so the client can restore cards on page load."""
+    import json as _json
     from datetime import datetime as _dt
     today = timezone.localdate()
     now_local = timezone.localtime()
+    now_naive = now_local.replace(tzinfo=None)
 
-    qs = PlaySession.objects.filter(session_date=today, is_active=True)
+    base_qs = PlaySession.objects.filter(session_date=today, is_active=True)
     if not request.user.is_superuser:
-        qs = qs.filter(created_by=request.user)
-    sessions = qs.select_related('account', 'account__play_info', 'account__payment')
+        base_qs = base_qs.filter(created_by=request.user)
+    base_qs = base_qs.select_related('account', 'account__payment')
+
+    playing_qs = base_qs.filter(is_pending=False)
+    pending_qs = base_qs.filter(is_pending=True)
 
     result = []
-    for s in sessions:
+    for s in playing_qs:
         start_dt = _dt.combine(today, s.start_time)
         end_dt = _dt.combine(today, s.end_time)
         if end_dt < start_dt:
             end_dt += timedelta(days=1)
 
         if s.paused and s.pause_time:
-            # Session is paused: seconds_left = time remaining at moment of pause
-            # (end_time hasn't been extended yet — that happens on resume)
             pause_local = timezone.localtime(s.pause_time).replace(tzinfo=None)
             seconds_left = int((end_dt - pause_local).total_seconds())
         else:
-            seconds_left = int((end_dt - now_local.replace(tzinfo=None)).total_seconds())
+            seconds_left = int((end_dt - now_naive).total_seconds())
 
-        if seconds_left <= 0:
-            # Session should have finished already — mark it done
-            s.is_active = False
-            s.save(update_fields=['is_active'])
-            continue
+        timed_out = seconds_left <= 0
+        if timed_out:
+            seconds_left = 0
         acc = s.account
         result.append({
             'session_id': s.id,
             'seconds_left': seconds_left,
+            'timed_out': timed_out,
             'end_time': s.end_time.strftime('%H:%M'),
             'paused': s.paused,
+            'created_by': s.created_by.username if s.created_by else None,
             'account': {
                 'id': acc.id,
                 'nick': acc.nick,
@@ -791,26 +783,56 @@ def active_sessions(request):
                 'min_balance': str(acc.payment.min_balance) if hasattr(acc, 'payment') else '0.00',
             },
         })
-    # Also return server-side pending sessions (not yet started)
-    now_ts2 = now_local.timestamp()
-    raw_pending = request.session.get('pending_sessions', {})
+
+    # Superusers monitor all playing sessions; they don't interact with pending sessions
+    if request.user.is_superuser:
+        return JsonResponse({'sessions': result, 'pending': []})
+
     pending_result = []
-    live_pending2 = {}
-    for aid_str, ps in raw_pending.items():
-        if ps.get('expires_at', 0) > now_ts2:
-            expires_in = int(ps['expires_at'] - now_ts2)
-            pending_result.append({
-                'account': ps['account'],
-                'duration_minutes': ps['duration_minutes'],
-                'remaining_minutes': ps['remaining_minutes'],
-                'expires_in_seconds': expires_in,
-            })
-            live_pending2[aid_str] = ps
-    if len(live_pending2) != len(raw_pending):
-        request.session['pending_sessions'] = live_pending2
-        request.session.modified = True
+    for s in pending_qs:
+        end_dt = _dt.combine(today, s.end_time)
+        expires_in = int((end_dt - now_naive).total_seconds())
+        if expires_in <= 0:
+            s.is_active = False
+            s.save(update_fields=['is_active'])
+            continue
+        try:
+            meta = _json.loads(s.notes or '{}')
+            duration_minutes = meta.get('d', 60)
+            remaining_minutes = meta.get('r', 0)
+        except (ValueError, TypeError):
+            duration_minutes, remaining_minutes = 60, 0
+        acc = s.account
+        pending_result.append({
+            'session_id': s.id,
+            'expires_in_seconds': expires_in,
+            'duration_minutes': duration_minutes,
+            'remaining_minutes': remaining_minutes,
+            'account': {
+                'id': acc.id,
+                'nick': acc.nick,
+                'platform': str(acc.platform) if acc.platform else '',
+                'phone': acc.phone or '',
+                'withdraw_pass': acc.payment.withdraw_pass if hasattr(acc, 'payment') else '',
+                'min_balance': str(acc.payment.min_balance) if hasattr(acc, 'payment') else '0.00',
+            },
+        })
 
     return JsonResponse({'sessions': result, 'pending': pending_result})
+
+
+@login_required
+def cancel_pending_session(request):
+    """Delete a pending PlaySession so the account becomes available again immediately."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    import json
+    data = json.loads(request.body)
+    session_id = data.get('session_id')
+
+    PlaySession.objects.filter(pk=session_id, is_pending=True, created_by=request.user).delete()
+    return JsonResponse({'ok': True})
 
 
 @login_required
