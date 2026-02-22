@@ -24,8 +24,13 @@
 <template id="session-card-tpl">
     <div class="card shadow mb-3 session-card">
         <div class="card-body">
+            {% if user.is_superuser %}
+            <p class="card-created-by mb-2" style="display:none; font-size:1.3rem; color:#555;"></p>
+            {% endif %}
             <div class="d-flex justify-content-between align-items-start mb-2">
-                <h5 class="card-title fw-bold mb-0 card-nick"></h5>
+                <div>
+                    <h5 class="card-title fw-bold mb-0 card-nick"></h5>
+                </div>
                 <div class="d-flex gap-2 align-items-center">
                     <span class="badge bg-secondary card-status" style="font-size:0.95rem; padding: 0.4em 0.75em;">Pending</span>
                     <button class="btn btn-sm btn-outline-danger card-quit-btn" title="Quit session">
@@ -42,7 +47,7 @@
             <div class="card-pending-section">
                 <p class="text-muted mb-1">Duration: <strong class="card-duration"></strong> min</p>
                 <p class="text-muted mb-2" style="font-size:0.85rem;">Remaining today: <strong class="card-remaining"></strong> min</p>
-                <p class="text-warning mb-2" style="font-size:0.8rem;"><i class="bi bi-clock"></i> Expires in <span class="card-pending-expire-time">10:00</span></p>
+                <p class="text-warning mb-2" style="font-size:0.8rem;"><i class="bi bi-clock"></i> Expires in <span class="card-pending-expire-time">20:00</span></p>
                 <button class="btn btn-success card-start-btn" style="font-size:1.1rem; padding: 0.5rem 1.5rem;">
                     <i class="bi bi-play-fill"></i> Start Session
                 </button>
@@ -50,7 +55,10 @@
             <div class="card-running-section" style="display:none;">
                 <div class="d-flex align-items-center gap-3 mb-2">
                     <div class="display-6 fw-bold card-timer">--:--</div>
-                    <small class="text-muted">ends at <span class="card-end-time"></span></small>
+                    <div>
+                        <small class="text-muted d-block">ends at <span class="card-end-time"></span></small>
+                        <small class="card-remaining-after text-muted" style="display:none;"></small>
+                    </div>
                 </div>
                 <div class="d-flex gap-2">
                     <button class="btn btn-warning btn-sm card-pause-btn">
@@ -72,8 +80,14 @@
                     <i class="bi bi-stop-fill"></i> Stop Session
                 </button>
             </div>
-            <div class="card-done-section alert alert-success mb-0 mt-2" style="display:none;">
-                <i class="bi bi-check-circle-fill"></i> Session complete!
+            <div class="card-done-section mt-2" style="display:none;">
+                <div class="alert alert-success d-flex align-items-center justify-content-between mb-0 py-2">
+                    <span>
+                        <i class="bi bi-check-circle-fill"></i> <strong>Session complete!</strong>
+                        <small class="card-done-remaining d-block mt-1 text-muted"></small>
+                    </span>
+                    <button class="btn btn-sm btn-success card-done-btn ms-2">Done</button>
+                </div>
             </div>
         </div>
     </div>
@@ -104,7 +118,16 @@
         }
     }
 
-    function startPendingCountdown(card, expiresAtMs) {
+    function sortSessionCards() {
+        var list = document.getElementById('session-list');
+        var cards = Array.from(list.querySelectorAll('.session-card'));
+        cards.sort(function (a, b) {
+            return parseInt(a.dataset.endMs || '0') - parseInt(b.dataset.endMs || '0');
+        });
+        cards.forEach(function (c) { list.appendChild(c); });
+    }
+
+    function startPendingCountdown(card, expiresAtMs, pendingSessionId) {
         var expireEl = card.querySelector('.card-pending-expire-time');
         card._pendingInterval = setInterval(function () {
             var left = Math.max(0, Math.round((expiresAtMs - Date.now()) / 1000));
@@ -116,6 +139,14 @@
                 displayedAccountIds.delete(parseInt(card.dataset.accountId));
                 card.remove();
                 updatePlayButton();
+                // Release the DB lock so other users can pick this account
+                if (pendingSessionId) {
+                    fetch('/play/cancel-pending/', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                        body: JSON.stringify({ session_id: pendingSessionId }),
+                    }).catch(function () {});
+                }
             }
         }, 1000);
     }
@@ -144,18 +175,20 @@
                     showNoAccounts();
                     return;
                 }
-                addSessionCard(data.account, data.duration_minutes, data.remaining_minutes);
+                addSessionCard(data.account, data.duration_minutes, data.remaining_minutes, null, data.session_id);
             })
             .catch(showNoAccounts);
     }
 
-    function addSessionCard(account, durationMinutes, remainingMinutes, expiresAtMs) {
+    function addSessionCard(account, durationMinutes, remainingMinutes, expiresAtMs, pendingSessionId) {
         displayedAccountIds.add(account.id);
 
         var tpl = document.getElementById('session-card-tpl');
         var card = tpl.content.cloneNode(true).querySelector('.session-card');
         card.dataset.accountId = account.id;
-        var sessionId = null;
+        // sessionId starts as the pending session ID; stays the same after activation
+        var sessionId = pendingSessionId || null;
+        var isPending = true;
 
         card.querySelector('.card-nick').textContent = account.nick;
         card.querySelector('.card-platform').textContent = account.platform || '-';
@@ -165,15 +198,23 @@
         card.querySelector('.card-duration').textContent = durationMinutes;
         card.querySelector('.card-remaining').textContent = remainingMinutes;
 
-        // Start pending expiry countdown (10 min from now, or server-provided)
-        startPendingCountdown(card, expiresAtMs || (Date.now() + 10 * 60 * 1000));
+        // Start pending expiry countdown (20 min from now, or server-provided)
+        startPendingCountdown(card, expiresAtMs || (Date.now() + 20 * 60 * 1000), sessionId);
 
         // Quit button
         card.querySelector('.card-quit-btn').addEventListener('click', function () {
             clearInterval(card._pendingInterval);
             displayedAccountIds.delete(account.id);
-            if (sessionId) {
+            if (!isPending && sessionId) {
+                // Playing: finish the active session
                 fetch('/play/finish-session/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                    body: JSON.stringify({ session_id: sessionId }),
+                }).finally(function () { card.remove(); updatePlayButton(); });
+            } else if (sessionId) {
+                // Pending: cancel the pending session, releasing the lock
+                fetch('/play/cancel-pending/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
                     body: JSON.stringify({ session_id: sessionId }),
@@ -193,11 +234,12 @@
             fetch('/play/start-session/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
-                body: JSON.stringify({ account_id: account.id, duration_minutes: durationMinutes }),
+                body: JSON.stringify({ session_id: sessionId, duration_minutes: durationMinutes }),
             })
             .then(r => r.json())
             .then(function (data) {
                 sessionId = data.session_id;
+                isPending = false;
                 card.querySelector('.card-pending-section').style.display = 'none';
                 card.querySelector('.card-running-section').style.display = 'block';
                 card.querySelector('.card-status').textContent = 'Playing';
@@ -209,10 +251,16 @@
                 const hh = String(endDate.getHours()).padStart(2, '0');
                 const mm = String(endDate.getMinutes()).padStart(2, '0');
                 card.querySelector('.card-end-time').textContent = hh + ':' + mm;
+                var remainingAfterEl = card.querySelector('.card-remaining-after');
+                var remainingAfter = Math.max(0, remainingMinutes - durationMinutes);
+                remainingAfterEl.textContent = 'After session: ' + remainingAfter + ' min remaining';
+                remainingAfterEl.style.display = 'block';
+                card.dataset.endMs = String(Date.now() + durationMinutes * 60000);
                 startCountdown(card, durationMinutes * 60, function () {
                     onTimerExpired(card);
                 });
                 setupPauseResume(card, sessionId, account.id);
+                sortSessionCards();
             });
         });
 
@@ -395,7 +443,7 @@
             .then(r => r.json())
             .then(function (data) {
                 if (data.ok) {
-                    doFinishSession(card, sessionId, accountId);
+                    doFinishSession(card, sessionId, accountId, data.remaining_after);
                 }
             });
         });
@@ -412,7 +460,7 @@
             .then(r => r.json())
             .then(function (data) {
                 if (data.ok) {
-                    doFinishSession(card, sessionId, accountId);
+                    doFinishSession(card, sessionId, accountId, data.remaining_after);
                 }
             });
         });
@@ -428,22 +476,27 @@
         card.querySelector('.card-quit-btn').style.display = 'none';
     }
 
-    // Called after stop-session API succeeds — marks session done and removes card
-    function doFinishSession(card, sessionId, accountId) {
-        fetch('/play/finish-session/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
-            body: JSON.stringify({ session_id: sessionId }),
-        })
-        .then(function () {
-            displayedAccountIds.delete(accountId);
-            card.querySelector('.card-running-section').style.display = 'none';
-            card.querySelector('.card-timeup-section').style.display = 'none';
-            card.querySelector('.card-done-section').style.display = 'block';
-            card.querySelector('.card-status').textContent = 'Done';
-            card.querySelector('.card-status').className = 'badge bg-secondary card-status';
-            card.querySelector('.card-quit-btn').style.display = 'none';
-            setTimeout(function () { card.remove(); }, 3000);
+    // Called after stop-session API succeeds — shows done card; user must click Done to dismiss
+    function doFinishSession(card, sessionId, accountId, remainingAfter) {
+        displayedAccountIds.delete(accountId);
+        card.querySelector('.card-running-section').style.display = 'none';
+        card.querySelector('.card-timeup-section').style.display = 'none';
+        var doneSection = card.querySelector('.card-done-section');
+        doneSection.style.display = 'block';
+        card.querySelector('.card-status').textContent = 'Done';
+        card.querySelector('.card-status').className = 'badge bg-secondary card-status';
+        card.querySelector('.card-quit-btn').style.display = 'none';
+        if (remainingAfter !== undefined && remainingAfter !== null) {
+            card.querySelector('.card-done-remaining').textContent = 'Remaining today: ' + Math.round(remainingAfter) + ' min';
+        }
+        card.dataset.endMs = String(Number.MAX_SAFE_INTEGER);
+        sortSessionCards();
+        card.querySelector('.card-done-btn').addEventListener('click', function () {
+            fetch('/play/dismiss-session/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                body: JSON.stringify({ session_id: sessionId }),
+            }).finally(function () { card.remove(); updatePlayButton(); });
         });
     }
 
@@ -544,6 +597,53 @@
         }).catch(function () {});
     }
 
+    function restoreDoneCard(account, sessionId, remainingAfter, createdBy) {
+        displayedAccountIds.add(account.id);
+
+        var tpl = document.getElementById('session-card-tpl');
+        var card = tpl.content.cloneNode(true).querySelector('.session-card');
+        card.dataset.accountId = account.id;
+        card.dataset.endMs = String(Number.MAX_SAFE_INTEGER);
+
+        card.querySelector('.card-nick').textContent = account.nick;
+        if (createdBy) {
+            var createdByEl = card.querySelector('.card-created-by');
+            if (createdByEl) {
+                createdByEl.innerHTML = 'Started by <strong>' + createdBy + '</strong>:';
+                createdByEl.style.display = 'block';
+            }
+        }
+        card.querySelector('.card-platform').textContent = account.platform || '-';
+        card.querySelector('.card-phone').textContent = account.phone || '-';
+        card.querySelector('.card-withdraw-pass').textContent = account.withdraw_pass || '-';
+        card.querySelector('.card-min-balance').textContent = account.min_balance || '0.00';
+        card.querySelector('.card-pending-section').style.display = 'none';
+        card.querySelector('.card-running-section').style.display = 'none';
+        card.querySelector('.card-timeup-section').style.display = 'none';
+        card.querySelector('.card-done-section').style.display = 'block';
+        card.querySelector('.card-quit-btn').style.display = 'none';
+        card.querySelector('.card-status').textContent = 'Done';
+        card.querySelector('.card-status').className = 'badge bg-secondary card-status';
+        if (remainingAfter !== undefined && remainingAfter !== null) {
+            card.querySelector('.card-done-remaining').textContent = 'Remaining today: ' + Math.round(remainingAfter) + ' min';
+        }
+
+        card.querySelector('.card-done-btn').addEventListener('click', function () {
+            fetch('/play/dismiss-session/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                body: JSON.stringify({ session_id: sessionId }),
+            }).finally(function () {
+                displayedAccountIds.delete(account.id);
+                card.remove();
+                updatePlayButton();
+            });
+        });
+
+        document.getElementById('session-list').appendChild(card);
+        updatePlayButton();
+    }
+
     function restoreActiveSessions() {
         fetch('/play/active-sessions/')
             .then(function (r) {
@@ -553,16 +653,20 @@
             .then(function (data) {
                 if (!data) return;
                 data.sessions.forEach(function (s) {
-                    restoreSessionCard(s.account, s.session_id, s.seconds_left, s.end_time, s.paused);
+                    restoreSessionCard(s.account, s.session_id, s.seconds_left, s.end_time, s.paused, s.created_by, s.timed_out, s.remaining_after);
+                });
+                (data.done || []).forEach(function (d) {
+                    restoreDoneCard(d.account, d.session_id, d.remaining_after, d.created_by);
                 });
                 (data.pending || []).forEach(function (p) {
-                    addSessionCard(p.account, p.duration_minutes, p.remaining_minutes, Date.now() + p.expires_in_seconds * 1000);
+                    addSessionCard(p.account, p.duration_minutes, p.remaining_minutes, Date.now() + p.expires_in_seconds * 1000, p.session_id);
                 });
+                sortSessionCards();
             })
             .catch(function (e) { console.error('active-sessions fetch error', e); });
     }
 
-    function restoreSessionCard(account, sessionId, secondsLeft, endTime, paused) {
+    function restoreSessionCard(account, sessionId, secondsLeft, endTime, paused, createdBy, timedOut, remainingAfter) {
         displayedAccountIds.add(account.id);
 
         var tpl = document.getElementById('session-card-tpl');
@@ -570,20 +674,35 @@
         card.dataset.accountId = account.id;
 
         card.querySelector('.card-nick').textContent = account.nick;
+        if (createdBy) {
+            var createdByEl = card.querySelector('.card-created-by');
+            if (createdByEl) {
+                createdByEl.innerHTML = 'Started by <strong>' + createdBy + '</strong>:';
+                createdByEl.style.display = 'block';
+            }
+        }
         card.querySelector('.card-platform').textContent = account.platform || '-';
         card.querySelector('.card-phone').textContent = account.phone || '-';
         card.querySelector('.card-withdraw-pass').textContent = account.withdraw_pass || '-';
         card.querySelector('.card-min-balance').textContent = account.min_balance || '0.00';
         card.querySelector('.card-pending-section').style.display = 'none';
-        card.querySelector('.card-running-section').style.display = 'block';
-        const restoredEnd = new Date(Date.now() + secondsLeft * 1000);
-        const rHH = String(restoredEnd.getHours()).padStart(2, '0');
-        const rMM = String(restoredEnd.getMinutes()).padStart(2, '0');
-        card.querySelector('.card-end-time').textContent = rHH + ':' + rMM;
         card.style.backgroundColor = '#d1f5d3';
         card.style.borderColor = '#6dbb74';
 
-        if (paused) {
+        card.dataset.endMs = timedOut ? '0' : String(Date.now() + secondsLeft * 1000);
+
+        if (timedOut) {
+            card.querySelector('.card-running-section').style.display = 'none';
+            card.querySelector('.card-timeup-section').style.display = 'block';
+            card.querySelector('.card-quit-btn').style.display = 'none';
+            card.querySelector('.card-status').textContent = "Time's up!";
+            card.querySelector('.card-status').className = 'badge bg-danger card-status';
+        } else if (paused) {
+            card.querySelector('.card-running-section').style.display = 'block';
+            const restoredEnd = new Date(Date.now() + secondsLeft * 1000);
+            const rHH = String(restoredEnd.getHours()).padStart(2, '0');
+            const rMM = String(restoredEnd.getMinutes()).padStart(2, '0');
+            card.querySelector('.card-end-time').textContent = rHH + ':' + rMM;
             card.querySelector('.card-status').textContent = 'Paused';
             card.querySelector('.card-status').className = 'badge bg-warning card-status';
             card.querySelector('.card-pause-btn').style.display = 'none';
@@ -595,9 +714,19 @@
                 onTimerExpired(card);
             };
         } else {
+            card.querySelector('.card-running-section').style.display = 'block';
+            const restoredEnd = new Date(Date.now() + secondsLeft * 1000);
+            const rHH = String(restoredEnd.getHours()).padStart(2, '0');
+            const rMM = String(restoredEnd.getMinutes()).padStart(2, '0');
+            card.querySelector('.card-end-time').textContent = rHH + ':' + rMM;
             card.querySelector('.card-status').textContent = 'Playing';
             card.querySelector('.card-status').className = 'badge bg-success card-status';
             card.querySelector('.card-quit-btn').style.display = 'none';
+            if (remainingAfter !== undefined && remainingAfter !== null) {
+                var raEl = card.querySelector('.card-remaining-after');
+                raEl.textContent = 'After session: ' + Math.round(remainingAfter) + ' min remaining';
+                raEl.style.display = 'block';
+            }
             startCountdown(card, secondsLeft, function () {
                 onTimerExpired(card);
             });
@@ -614,7 +743,7 @@
 
         setupPauseResume(card, sessionId, account.id);
 
-        document.getElementById('session-list').prepend(card);
+        document.getElementById('session-list').appendChild(card);
         updatePlayButton();
     }
 

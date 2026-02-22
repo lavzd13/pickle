@@ -39,6 +39,8 @@ urlpatterns = [
     path('play/pause-session/', web_views.pause_session_play, name='pause_session_play'),
     path('play/resume-session/', web_views.resume_session_play, name='resume_session_play'),
     path('play/stop-session/', web_views.stop_session, name='stop_session'),
+    path('play/cancel-pending/', web_views.cancel_pending_session, name='cancel_pending_session'),
+    path('play/dismiss-session/', web_views.dismiss_session, name='dismiss_session'),
 
     # Deposit/Withdrawals
     path('deposit-withdrawal/', web_views.deposit_withdrawal, name='deposit_withdrawal'),
