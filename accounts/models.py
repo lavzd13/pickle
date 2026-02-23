@@ -61,7 +61,7 @@ class AccountDetail(models.Model):
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=20, blank=True, null=True)
     is_new = models.BooleanField(default=False)
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=False)
     is_inactive = models.BooleanField(default=False)
     is_banned = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
