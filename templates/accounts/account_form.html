@@ -62,8 +62,25 @@
                         </div>
                     </div>
                     
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Account Status</label>
+                            <div class="d-flex gap-4 flex-wrap mt-1">
+                                {% for radio in account_form.account_status %}
+                                <div class="form-check">
+                                    {{ radio.tag }}
+                                    <label class="form-check-label" for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% if account_form.account_status.errors %}
+                            <div class="text-danger">{{ account_form.account_status.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
                     <hr class="my-4">
-                    
+
                     <h5 class="mb-3">Payment Information</h5>
                     
                     <div class="row">

@@ -27,9 +27,12 @@
             {% if user.is_superuser %}
             <p class="card-created-by mb-2" style="display:none; font-size:1.3rem; color:#555;"></p>
             {% endif %}
-            <div class="d-flex justify-content-between align-items-start mb-2">
+            <div class="d-flex justify-content-between align-items-center mb-2" style="position: relative;">
                 <div>
-                    <h5 class="card-title fw-bold mb-0 card-nick"></h5>
+                    <h5 class="card-title fw-bold mb-0"><span class="card-nick"></span></h5>
+                </div>
+                <div class="card-last-session-wrapper" style="display:none; position: absolute; left: 50%; transform: translateX(-50%);">
+                    <span class="badge bg-warning text-dark" style="font-size:0.95rem; padding:0.4em 1em; letter-spacing:0.03em; white-space:nowrap;">Last Session</span>
                 </div>
                 <div class="d-flex gap-2 align-items-center">
                     <span class="badge bg-secondary card-status" style="font-size:0.95rem; padding: 0.4em 0.75em;">Pending</span>
@@ -39,6 +42,7 @@
                 </div>
             </div>
             <div class="mb-2" style="font-size:0.9rem;">
+                <div><span class="text-muted">Device name:</span> <span class="card-device-name"></span></div>
                 <div><span class="text-muted">Platform:</span> <span class="card-platform"></span></div>
                 <div><span class="text-muted">Phone:</span> <span class="card-phone"></span></div>
                 <div><span class="text-muted">Withdraw Pass:</span> <span class="card-withdraw-pass"></span></div>
@@ -81,6 +85,7 @@
                 </button>
             </div>
             <div class="card-done-section mt-2" style="display:none;">
+                <div class="badge bg-danger card-last-session-done-badge mb-1 d-none" style="width:100%; font-size:0.85rem; padding:0.4em 0.6em;">Last session done</div>
                 <div class="alert alert-success d-flex align-items-center justify-content-between mb-0 py-2">
                     <span>
                         <i class="bi bi-check-circle-fill"></i> <strong>Session complete!</strong>
@@ -121,10 +126,27 @@
     function sortSessionCards() {
         var list = document.getElementById('session-list');
         var cards = Array.from(list.querySelectorAll('.session-card'));
+        // Priority: 1=needs stop, 2=done, 3=pending, 4=active (sorted by time asc)
         cards.sort(function (a, b) {
+            var pa = parseInt(a.dataset.sortPriority || '4');
+            var pb = parseInt(b.dataset.sortPriority || '4');
+            if (pa !== pb) return pa - pb;
             return parseInt(a.dataset.endMs || '0') - parseInt(b.dataset.endMs || '0');
         });
         cards.forEach(function (c) { list.appendChild(c); });
+    }
+
+    function markLastSession(card) {
+        var wrapper = card.querySelector('.card-last-session-wrapper');
+        if (wrapper) wrapper.style.display = 'block';
+    }
+
+    function markLastSessionDone(card) {
+        card.style.borderColor = '#dc3545';
+        card.style.borderWidth = '3px';
+        card.style.borderStyle = 'solid';
+        var badge = card.querySelector('.card-last-session-done-badge');
+        if (badge) badge.classList.remove('d-none');
     }
 
     function startPendingCountdown(card, expiresAtMs, pendingSessionId) {
@@ -186,11 +208,13 @@
         var tpl = document.getElementById('session-card-tpl');
         var card = tpl.content.cloneNode(true).querySelector('.session-card');
         card.dataset.accountId = account.id;
+        card.dataset.sortPriority = '3'; // pending
         // sessionId starts as the pending session ID; stays the same after activation
         var sessionId = pendingSessionId || null;
         var isPending = true;
 
         card.querySelector('.card-nick').textContent = account.nick;
+        card.querySelector('.card-device-name').textContent = account.device_name || '-';
         card.querySelector('.card-platform').textContent = account.platform || '-';
         card.querySelector('.card-phone').textContent = account.phone || '-';
         card.querySelector('.card-withdraw-pass').textContent = account.withdraw_pass || '-';
@@ -255,6 +279,8 @@
                 var remainingAfter = Math.max(0, remainingMinutes - durationMinutes);
                 remainingAfterEl.textContent = 'After session: ' + remainingAfter + ' min remaining';
                 remainingAfterEl.style.display = 'block';
+                if (remainingAfter < 20) markLastSession(card);
+                card.dataset.sortPriority = '4'; // active
                 card.dataset.endMs = String(Date.now() + durationMinutes * 60000);
                 startCountdown(card, durationMinutes * 60, function () {
                     onTimerExpired(card);
@@ -474,6 +500,9 @@
         card.querySelector('.card-status').textContent = "Time's up!";
         card.querySelector('.card-status').className = 'badge bg-danger card-status';
         card.querySelector('.card-quit-btn').style.display = 'none';
+        card.dataset.sortPriority = '1'; // needs stop — move to top
+        card.dataset.endMs = '0';
+        sortSessionCards();
     }
 
     // Called after stop-session API succeeds — shows done card; user must click Done to dismiss
@@ -488,7 +517,9 @@
         card.querySelector('.card-quit-btn').style.display = 'none';
         if (remainingAfter !== undefined && remainingAfter !== null) {
             card.querySelector('.card-done-remaining').textContent = 'Remaining today: ' + Math.round(remainingAfter) + ' min';
+            if (remainingAfter < 20) markLastSessionDone(card);
         }
+        card.dataset.sortPriority = '2'; // done
         card.dataset.endMs = String(Number.MAX_SAFE_INTEGER);
         sortSessionCards();
         card.querySelector('.card-done-btn').addEventListener('click', function () {
@@ -603,6 +634,7 @@
         var tpl = document.getElementById('session-card-tpl');
         var card = tpl.content.cloneNode(true).querySelector('.session-card');
         card.dataset.accountId = account.id;
+        card.dataset.sortPriority = '2'; // done
         card.dataset.endMs = String(Number.MAX_SAFE_INTEGER);
 
         card.querySelector('.card-nick').textContent = account.nick;
@@ -613,6 +645,7 @@
                 createdByEl.style.display = 'block';
             }
         }
+        card.querySelector('.card-device-name').textContent = account.device_name || '-';
         card.querySelector('.card-platform').textContent = account.platform || '-';
         card.querySelector('.card-phone').textContent = account.phone || '-';
         card.querySelector('.card-withdraw-pass').textContent = account.withdraw_pass || '-';
@@ -621,11 +654,14 @@
         card.querySelector('.card-running-section').style.display = 'none';
         card.querySelector('.card-timeup-section').style.display = 'none';
         card.querySelector('.card-done-section').style.display = 'block';
+        card.style.backgroundColor = '#d1f5d3';
+        card.style.borderColor = '#6dbb74';
         card.querySelector('.card-quit-btn').style.display = 'none';
         card.querySelector('.card-status').textContent = 'Done';
         card.querySelector('.card-status').className = 'badge bg-secondary card-status';
         if (remainingAfter !== undefined && remainingAfter !== null) {
             card.querySelector('.card-done-remaining').textContent = 'Remaining today: ' + Math.round(remainingAfter) + ' min';
+            if (remainingAfter < 20) markLastSessionDone(card);
         }
 
         card.querySelector('.card-done-btn').addEventListener('click', function () {
@@ -681,6 +717,7 @@
                 createdByEl.style.display = 'block';
             }
         }
+        card.querySelector('.card-device-name').textContent = account.device_name || '-';
         card.querySelector('.card-platform').textContent = account.platform || '-';
         card.querySelector('.card-phone').textContent = account.phone || '-';
         card.querySelector('.card-withdraw-pass').textContent = account.withdraw_pass || '-';
@@ -690,6 +727,7 @@
         card.style.borderColor = '#6dbb74';
 
         card.dataset.endMs = timedOut ? '0' : String(Date.now() + secondsLeft * 1000);
+        card.dataset.sortPriority = timedOut ? '1' : '4'; // 1=needs stop, 4=active/paused
 
         if (timedOut) {
             card.querySelector('.card-running-section').style.display = 'none';
@@ -730,6 +768,10 @@
             startCountdown(card, secondsLeft, function () {
                 onTimerExpired(card);
             });
+        }
+
+        if (remainingAfter !== undefined && remainingAfter !== null && remainingAfter < 20) {
+            markLastSession(card);
         }
 
         card.querySelector('.card-quit-btn').addEventListener('click', function () {
