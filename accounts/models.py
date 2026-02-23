@@ -222,6 +222,7 @@ class PlaySession(models.Model):
     is_done = models.BooleanField(default=False)
     paused = models.BooleanField(default=False)
     pause_time = models.DateTimeField(null=True, blank=True)
+    break_until = models.DateTimeField(null=True, blank=True)
 
     objects = PlaySessionManager()
 

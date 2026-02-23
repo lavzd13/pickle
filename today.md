@@ -3,18 +3,18 @@ Regarding sound, SOUND MUST BE ENABLED IN THE BROWSER BECAUSE THAT IS FUCKING HI
 !!! SOUND WORKS NOW !!!
 
 TODO:
-- !!! OFF TIME (0, 30, 10) !!!
 - Creation date of the pokerclans account field (date when it was registered in app)
 - Add network option for payment table
 - Put default value for withdrawal balance to be 1600. Also change the name of it, make smth better
-- Put emoji for non Active account, also make their name little bit transparent
-- Make nickname of the account in the account list able to be copy/pasted.
-- Add copy buttons next to all info inside of account list/info
-- Withdrawal balance
+- Withdrawal balance make it more clear
 
 
 
 DONE:
+- Put emoji for non Active account, also make their name little bit transparent
+- Make nickname of the account in the account list able to be copy/pasted.
+- Add copy buttons next to all info inside of account list/info
+- !!! OFF TIME (0, 30, 10) !!!
 - If account is set as active on Save Account button schedule for that account should be created
 - Status of account inside of account info (new, active, inactive, banned)
 - Put name of emulator device in session card

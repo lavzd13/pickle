@@ -298,10 +298,17 @@ def manage_day_sessions(request, account_id, date):
 @user_passes_test(is_superuser)
 def account_list(request):
     """List all accounts (superuser only)"""
-    accounts = AccountDetail.objects.all().select_related('payment')
-    
+    all_accounts = AccountDetail.objects.all().select_related('payment', 'last_transaction')
+
+    groups = [
+        ('Active',   'acc-active',   [a for a in all_accounts if a.is_active]),
+        ('New',      'acc-new',      [a for a in all_accounts if a.is_new]),
+        ('Inactive', 'acc-inactive', [a for a in all_accounts if a.is_inactive]),
+        ('Banned',   'acc-banned',   [a for a in all_accounts if a.is_banned]),
+    ]
+
     context = {
-        'accounts': accounts,
+        'groups': groups,
     }
     return render(request, 'accounts/account_list.html', context)
 
@@ -370,6 +377,7 @@ def account_edit(request, pk):
     last_transaction = getattr(account, 'last_transaction', None)
 
     if request.method == 'POST':
+        was_active = account.is_active  # capture before the form overwrites it
         account_form = AccountDetailForm(request.POST, instance=account)
         payment_form = PaymentForm(request.POST, instance=payment)
         location_form = LocationForm(request.POST, instance=location)
@@ -409,7 +417,7 @@ def account_edit(request, pk):
                 last_transaction.account = account
                 last_transaction.save()
 
-            if account.is_active:
+            if account.is_active and not was_active:
                 calculate_play_info(account)
 
             messages.success(request, f'Gaming account {account.nick} updated successfully!')
@@ -651,7 +659,17 @@ def eligible_account(request):
         mins = (end_dt - start_dt).total_seconds() / 60
         played_minutes[s.account_id] = played_minutes.get(s.account_id, 0) + mins
 
-    eligible = []  # list of (account, remaining_minutes)
+    # Accounts currently on break (session finished recently, break timer still running)
+    now_utc = timezone.now()
+    on_break_map = {}  # account_id -> break_until (latest)
+    for s in PlaySession.objects.filter(break_until__gt=now_utc).values('account_id', 'break_until'):
+        acc_id = s['account_id']
+        bu = s['break_until']
+        if acc_id not in on_break_map or bu > on_break_map[acc_id]:
+            on_break_map[acc_id] = bu
+
+    eligible = []        # list of (account, remaining_minutes)
+    on_break_eligible = []  # accounts that pass all checks but are on break
     for acc in all_accounts:
         if acc.id in excluded_ids:
             continue
@@ -667,9 +685,18 @@ def eligible_account(request):
         remaining = schedule_minutes - played_minutes.get(acc.id, 0)
         if remaining < 20:  # not enough time left for even a minimum session
             continue
+        if acc.id in on_break_map:
+            on_break_eligible.append((acc, remaining, on_break_map[acc.id]))
+            continue
         eligible.append((acc, remaining))
 
     if not eligible:
+        if on_break_eligible:
+            min_break_left = min(
+                max(1, int((bu - now_utc).total_seconds() / 60) + 1)
+                for _, _, bu in on_break_eligible
+            )
+            return JsonResponse({'eligible': False, 'on_break': True, 'minutes_left': min_break_left})
         return JsonResponse({'eligible': False})
 
     acc, remaining_minutes = random.choice(eligible)
@@ -912,8 +939,23 @@ def finish_session_play(request):
     session_id = data.get('session_id')
 
     session = get_object_or_404(PlaySession, pk=session_id)
+
+    import json as _json
+    from datetime import datetime as _dt
+    try:
+        meta = _json.loads(session.notes or '{}')
+        given_duration = int(meta.get('d', 0))
+        r = int(meta.get('r', 0))
+    except Exception:
+        given_duration = 0
+        r = 0
+
+    actual_minutes = int(session.duration.total_seconds() / 60)
+    remaining_after = max(0, r - actual_minutes)
+
     session.is_active = False
-    session.save(update_fields=['is_active'])
+    session.notes = f"Given duration: {given_duration} min; Actual duration: {actual_minutes} min; Remaining: {remaining_after} min"
+    session.save(update_fields=['is_active', 'notes'])
 
     return JsonResponse({'ok': True})
 
@@ -1003,15 +1045,20 @@ def stop_session(request):
 
     try:
         meta = _json.loads(session.notes or '{}')
+        given_duration = int(meta.get('d', 0))
         r = int(meta.get('r', 0))
     except Exception:
+        given_duration = 0
         r = 0
     remaining_after = max(0, r - actual_minutes)
 
+    break_minutes = round(gaussian_sample(0, 30, 10))
     session.end_time = actual_stop_time
     session.is_done = True
     session.paused = False
-    session.save(update_fields=['end_time', 'is_done', 'paused'])
+    session.break_until = timezone.now() + timedelta(minutes=break_minutes)
+    session.notes = f"Given duration: {given_duration} min; Actual duration: {actual_minutes} min; Remaining: {remaining_after} min"
+    session.save(update_fields=['end_time', 'is_done', 'paused', 'break_until', 'notes'])
 
     return JsonResponse({'ok': True, 'remaining_after': remaining_after})
 
