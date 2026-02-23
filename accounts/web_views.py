@@ -337,6 +337,9 @@ def account_create(request):
             last_transaction.account = account
             last_transaction.save()
 
+            if account.is_active:
+                calculate_play_info(account)
+
             messages.success(request, f'Gaming account {account.nick} created successfully!')
             return redirect('account_list')
     else:
@@ -376,7 +379,7 @@ def account_edit(request, pk):
         if (account_form.is_valid() and payment_form.is_valid() and
                 location_form.is_valid() and
                 security_form.is_valid() and last_transaction_form.is_valid()):
-            account_form.save()
+            account = account_form.save()
 
             if payment:
                 payment_form.save()
@@ -405,6 +408,9 @@ def account_edit(request, pk):
                 last_transaction = last_transaction_form.save(commit=False)
                 last_transaction.account = account
                 last_transaction.save()
+
+            if account.is_active:
+                calculate_play_info(account)
 
             messages.success(request, f'Gaming account {account.nick} updated successfully!')
             return redirect('account_list')
@@ -603,10 +609,11 @@ def eligible_account(request):
 
     all_accounts = list(AccountDetail.objects.select_related('play_info', 'payment').all())
 
-    # Auto-expire active sessions whose end_time has already passed
+    # Auto-expire only pending sessions whose 20-min lock has passed
+    # (playing/done sessions are only deactivated by explicit user action)
     now_time = now_local.time()
     PlaySession.objects.filter(
-        session_date=today, is_active=True, is_done=False, end_time__lte=now_time
+        session_date=today, is_active=True, is_pending=True, end_time__lte=now_time
     ).update(is_active=False)
 
     # Delete stale pending sessions from previous days
@@ -648,6 +655,8 @@ def eligible_account(request):
     for acc in all_accounts:
         if acc.id in excluded_ids:
             continue
+        if not acc.is_active:
+            continue
         try:
             hours = acc.play_info.schedule_of_the_week.get(day_name, -1)
         except Exception:
@@ -671,6 +680,7 @@ def eligible_account(request):
     account_data = {
         'id': acc.id,
         'nick': acc.nick,
+        'device_name': acc.device_name,
         'platform': str(acc.platform) if acc.platform else '',
         'phone': acc.phone or '',
         'withdraw_pass': acc.payment.withdraw_pass if hasattr(acc, 'payment') else '',
@@ -741,14 +751,23 @@ def active_sessions(request):
     now_local = timezone.localtime()
     now_naive = now_local.replace(tzinfo=None)
 
-    base_qs = PlaySession.objects.filter(session_date=today, is_active=True)
-    if not request.user.is_superuser:
-        base_qs = base_qs.filter(created_by=request.user)
-    base_qs = base_qs.select_related('account', 'account__payment')
+    # Playing: superusers monitor all users' sessions; others see own only
+    if request.user.is_superuser:
+        playing_qs = PlaySession.objects.filter(
+            session_date=today, is_active=True, is_pending=False, is_done=False
+        ).select_related('account', 'account__payment', 'created_by')
+    else:
+        playing_qs = PlaySession.objects.filter(
+            session_date=today, is_active=True, is_pending=False, is_done=False,
+            created_by=request.user
+        ).select_related('account', 'account__payment')
 
-    playing_qs = base_qs.filter(is_pending=False, is_done=False)
-    done_qs = base_qs.filter(is_pending=False, is_done=True)
-    pending_qs = base_qs.filter(is_pending=True)
+    # Pending and done are always the current user's own sessions
+    own_qs = PlaySession.objects.filter(
+        session_date=today, is_active=True, created_by=request.user
+    ).select_related('account', 'account__payment')
+    pending_qs = own_qs.filter(is_pending=True)
+    done_qs = own_qs.filter(is_pending=False, is_done=True)
 
     result = []
     for s in playing_qs:
@@ -783,6 +802,7 @@ def active_sessions(request):
             'account': {
                 'id': acc.id,
                 'nick': acc.nick,
+                'device_name': acc.device_name,
                 'platform': str(acc.platform) if acc.platform else '',
                 'phone': acc.phone or '',
                 'withdraw_pass': acc.payment.withdraw_pass if hasattr(acc, 'payment') else '',
@@ -811,16 +831,13 @@ def active_sessions(request):
             'account': {
                 'id': acc.id,
                 'nick': acc.nick,
+                'device_name': acc.device_name,
                 'platform': str(acc.platform) if acc.platform else '',
                 'phone': acc.phone or '',
                 'withdraw_pass': acc.payment.withdraw_pass if hasattr(acc, 'payment') else '',
                 'min_balance': str(acc.payment.min_balance) if hasattr(acc, 'payment') else '0.00',
             },
         })
-
-    # Superusers monitor all playing sessions; they don't interact with pending sessions
-    if request.user.is_superuser:
-        return JsonResponse({'sessions': result, 'done': done_result, 'pending': []})
 
     pending_result = []
     for s in pending_qs:
@@ -845,6 +862,7 @@ def active_sessions(request):
             'account': {
                 'id': acc.id,
                 'nick': acc.nick,
+                'device_name': acc.device_name,
                 'platform': str(acc.platform) if acc.platform else '',
                 'phone': acc.phone or '',
                 'withdraw_pass': acc.payment.withdraw_pass if hasattr(acc, 'payment') else '',

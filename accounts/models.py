@@ -60,6 +60,10 @@ class AccountDetail(models.Model):
     platform = models.ForeignKey(Platform, on_delete=models.SET_NULL, null=True, blank=True)
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=20, blank=True, null=True)
+    is_new = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    is_inactive = models.BooleanField(default=False)
+    is_banned = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

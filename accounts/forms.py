@@ -67,6 +67,19 @@ class SecurityForm(forms.ModelForm):
 		}
 
 class AccountDetailForm(forms.ModelForm):
+    ACCOUNT_STATUS_CHOICES = [
+        ('is_new', 'New'),
+        ('is_active', 'Active'),
+        ('is_inactive', 'Inactive'),
+        ('is_banned', 'Banned'),
+    ]
+    account_status = forms.ChoiceField(
+        choices=ACCOUNT_STATUS_CHOICES,
+        widget=forms.RadioSelect(attrs={'class': 'form-check-input'}),
+        initial='is_new',
+        label='Account Status',
+    )
+
     class Meta:
         model = AccountDetail
         fields = ['nick', 'device_name', 'email', 'platform', 'phone']
@@ -77,6 +90,29 @@ class AccountDetailForm(forms.ModelForm):
             'platform': forms.Select(attrs={'class': 'form-control'}),
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            if self.instance.is_active:
+                self.fields['account_status'].initial = 'is_active'
+            elif self.instance.is_inactive:
+                self.fields['account_status'].initial = 'is_inactive'
+            elif self.instance.is_banned:
+                self.fields['account_status'].initial = 'is_banned'
+            else:
+                self.fields['account_status'].initial = 'is_new'
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        status = self.cleaned_data.get('account_status', 'is_new')
+        instance.is_new = (status == 'is_new')
+        instance.is_active = (status == 'is_active')
+        instance.is_inactive = (status == 'is_inactive')
+        instance.is_banned = (status == 'is_banned')
+        if commit:
+            instance.save()
+        return instance
         
 
 class PlayInfoForm(forms.ModelForm):
