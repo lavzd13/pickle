@@ -22,7 +22,7 @@
                 <h6 class="card-title">Account Information</h6>
                 <p class="mb-1"><strong>Nick:</strong> {{ account.nick }}</p>
                 <p class="mb-1"><strong>Email:</strong> {{ account.email }}</p>
-                <p class="mb-1"><strong>Country:</strong> {{ account.country }}</p>
+                <p class="mb-1"><strong>Country:</strong> {{ account.location.country }}</p>
                 {% if account.phone %}
                 <p class="mb-1"><strong>Phone:</strong> {{ account.phone }}</p>
                 {% endif %}

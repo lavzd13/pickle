@@ -10,7 +10,67 @@
     <style>
         body {
             min-height: 100vh;
-            background-color: #f8f9fa;
+            background-color: #c7c8c8;
+        }
+
+        /* ── Surface overrides: replace Bootstrap's default white ── */
+        /* Cards */
+        .card {
+            background-color: #e0e1e2;
+        }
+        .card-header, .card-footer {
+            background-color: #d5d6d7;
+            border-color: #c4c5c6;
+        }
+        /* Modals */
+        .modal-content {
+            background-color: #e0e1e2;
+        }
+        .modal-header, .modal-footer {
+            background-color: #d5d6d7;
+            border-color: #c4c5c6;
+        }
+        /* List group items */
+        .list-group-item {
+            background-color: #e0e1e2;
+            border-color: #c8c9ca;
+        }
+        .list-group-item-action:hover,
+        .list-group-item-action:focus {
+            background-color: #d5d6d7;
+        }
+        /* Form inputs */
+        .form-control, .form-select {
+            background-color: #e8e9ea;
+            border-color: #b8b9ba;
+            color: #212529;
+        }
+        .form-control:focus, .form-select:focus {
+            background-color: #eeeff0;
+            border-color: #8a8b8c;
+        }
+        .form-control:disabled, .form-select:disabled {
+            background-color: #d4d5d6;
+        }
+        /* Input group addon */
+        .input-group-text {
+            background-color: #d5d6d7;
+            border-color: #b8b9ba;
+        }
+        /* Dropdowns */
+        .dropdown-menu {
+            background-color: #e0e1e2;
+            border-color: #c4c5c6;
+        }
+        .dropdown-item:hover, .dropdown-item:focus {
+            background-color: #d0d1d2;
+        }
+        /* Tables */
+        .table {
+            --bs-table-bg: #e0e1e2;
+            --bs-table-striped-bg: #d8d9da;
+            --bs-table-hover-bg: #d0d1d2;
+            --bs-table-border-color: #c4c5c6;
         }
         .sidebar {
             min-height: 100vh;

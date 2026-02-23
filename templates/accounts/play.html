@@ -13,6 +13,9 @@
         <div id="no-accounts-msg" class="alert alert-warning mt-3" style="display:none;">
             <i class="bi bi-calendar-x"></i> No eligible accounts available right now.
         </div>
+        <div id="on-break-msg" class="alert alert-info mt-3" style="display:none;">
+            <i class="bi bi-clock-history"></i> Accounts are on break right now. Try again in <strong id="break-minutes-left"></strong> min.
+        </div>
     </div>
 
     <!-- Active session cards injected here -->
@@ -51,7 +54,7 @@
             <div class="card-pending-section">
                 <p class="text-muted mb-1">Duration: <strong class="card-duration"></strong> min</p>
                 <p class="text-muted mb-2" style="font-size:0.85rem;">Remaining today: <strong class="card-remaining"></strong> min</p>
-                <p class="text-warning mb-2" style="font-size:0.8rem;"><i class="bi bi-clock"></i> Expires in <span class="card-pending-expire-time">20:00</span></p>
+                <p class="text-danger mb-2" style="font-size:0.8rem;"><i class="bi bi-clock"></i> Expires in <span class="card-pending-expire-time">20:00</span></p>
                 <button class="btn btn-success card-start-btn" style="font-size:1.1rem; padding: 0.5rem 1.5rem;">
                     <i class="bi bi-play-fill"></i> Start Session
                 </button>
@@ -180,10 +183,18 @@
 
     function hideNoAccounts() {
         document.getElementById('no-accounts-msg').style.display = 'none';
+        document.getElementById('on-break-msg').style.display = 'none';
     }
 
     function showNoAccounts() {
         document.getElementById('no-accounts-msg').style.display = 'block';
+        document.getElementById('on-break-msg').style.display = 'none';
+    }
+
+    function showOnBreak(minutesLeft) {
+        document.getElementById('break-minutes-left').textContent = minutesLeft;
+        document.getElementById('on-break-msg').style.display = 'block';
+        document.getElementById('no-accounts-msg').style.display = 'none';
     }
 
     function fetchAndAddSession() {
@@ -194,7 +205,11 @@
             .then(r => r.json())
             .then(function (data) {
                 if (!data.eligible) {
-                    showNoAccounts();
+                    if (data.on_break) {
+                        showOnBreak(data.minutes_left);
+                    } else {
+                        showNoAccounts();
+                    }
                     return;
                 }
                 addSessionCard(data.account, data.duration_minutes, data.remaining_minutes, null, data.session_id);
