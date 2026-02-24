@@ -8,7 +8,7 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db.models import Count, Q
 from django.utils import timezone
-from .models import PlaySession, AccountDetail, Payment, Location, Security, LastTransaction, PlayInfo, DepositWithdrawal
+from .models import PlaySession, AccountDetail, Payment, Location, Security, LastTransaction, PlayInfo, Deposit, Withdrawal, Network
 from django.db.models import Sum
 from django.forms import modelformset_factory
 from django.http import JsonResponse, HttpResponse
@@ -318,10 +318,10 @@ def account_create(request):
     """Create a new account (superuser only)"""
     if request.method == 'POST':
         account_form = AccountDetailForm(request.POST)
-        payment_form = PaymentForm(request.POST)
+        payment_form = PaymentForm(request.POST, prefix='payment')
         location_form = LocationForm(request.POST)
         security_form = SecurityForm(request.POST)
-        last_transaction_form = LastTransactionForm(request.POST, request.FILES)
+        last_transaction_form = LastTransactionForm(request.POST, request.FILES, prefix='last_tx')
 
         if (account_form.is_valid() and payment_form.is_valid() and
                 location_form.is_valid() and
@@ -351,10 +351,10 @@ def account_create(request):
             return redirect('account_list')
     else:
         account_form = AccountDetailForm()
-        payment_form = PaymentForm()
+        payment_form = PaymentForm(prefix='payment')
         location_form = LocationForm()
         security_form = SecurityForm()
-        last_transaction_form = LastTransactionForm()
+        last_transaction_form = LastTransactionForm(prefix='last_tx')
 
     return render(request, 'accounts/account_form.html', {
         'account_form': account_form,
@@ -379,10 +379,10 @@ def account_edit(request, pk):
     if request.method == 'POST':
         was_active = account.is_active  # capture before the form overwrites it
         account_form = AccountDetailForm(request.POST, instance=account)
-        payment_form = PaymentForm(request.POST, instance=payment)
+        payment_form = PaymentForm(request.POST, prefix='payment', instance=payment)
         location_form = LocationForm(request.POST, instance=location)
         security_form = SecurityForm(request.POST, instance=security)
-        last_transaction_form = LastTransactionForm(request.POST, request.FILES, instance=last_transaction)
+        last_transaction_form = LastTransactionForm(request.POST, request.FILES, prefix='last_tx', instance=last_transaction)
 
         if (account_form.is_valid() and payment_form.is_valid() and
                 location_form.is_valid() and
@@ -424,10 +424,10 @@ def account_edit(request, pk):
             return redirect('account_list')
     else:
         account_form = AccountDetailForm(instance=account)
-        payment_form = PaymentForm(instance=payment)
+        payment_form = PaymentForm(prefix='payment', instance=payment)
         location_form = LocationForm(instance=location)
         security_form = SecurityForm(instance=security)
-        last_transaction_form = LastTransactionForm(instance=last_transaction)
+        last_transaction_form = LastTransactionForm(prefix='last_tx', instance=last_transaction)
 
     return render(request, 'accounts/account_form.html', {
         'account_form': account_form,
@@ -1052,7 +1052,7 @@ def stop_session(request):
         r = 0
     remaining_after = max(0, r - actual_minutes)
 
-    break_minutes = round(gaussian_sample(0, 30, 10))
+    break_minutes = round(gaussian_sample(0, 30, 15))
     session.end_time = actual_stop_time
     session.is_done = True
     session.paused = False
@@ -1084,11 +1084,25 @@ def account_search(request):
             api_key = acc.security.api or ''
         except Security.DoesNotExist:
             pass
+        network_id = None
+        network_name = ''
+        wallet = ''
+        try:
+            payment = acc.payment
+            if payment.network:
+                network_id = payment.network.id
+                network_name = payment.network.name
+            wallet = payment.crypto_wallet or ''
+        except Exception:
+            pass
         results.append({
             'id': acc.id,
             'nick': acc.nick,
             'platform': str(acc.platform) if acc.platform else '',
             'api': api_key,
+            'network_id': network_id,
+            'network_name': network_name,
+            'wallet': wallet,
         })
 
     return JsonResponse({'results': results})
@@ -1097,41 +1111,74 @@ def account_search(request):
 @login_required
 def deposit_withdrawal(request):
     """Deposit/Withdrawal page — form with search bar."""
-    return render(request, 'accounts/deposit_withdrawal.html')
+    networks = Network.objects.all()
+    return render(request, 'accounts/deposit_withdrawal.html', {'networks': networks})
 
 
 @login_required
-def deposit_withdrawal_create(request):
-    """Create a deposit or withdrawal entry."""
+def deposit_create(request):
+    """Create a deposit entry."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
     import json
     data = json.loads(request.body)
     account_id = data.get('account_id')
-    deposit = data.get('deposit')
-    withdrawal = data.get('withdrawal')
+    amount = data.get('amount')
 
     if not account_id:
         return JsonResponse({'error': 'Account is required'}, status=400)
-    if not deposit and not withdrawal:
-        return JsonResponse({'error': 'Enter a deposit or withdrawal amount'}, status=400)
+    if not amount or float(amount) <= 0:
+        return JsonResponse({'error': 'Enter a valid amount'}, status=400)
 
     account = get_object_or_404(AccountDetail, pk=account_id)
-
-    entry = DepositWithdrawal.objects.create(
+    entry = Deposit.objects.create(
         account=account,
-        deposit=deposit if deposit else None,
-        withdrawal=withdrawal if withdrawal else None,
+        network_id=data.get('network_id') or None,
+        wallet=data.get('wallet', ''),
+        amount=amount,
+        current_balance=data.get('current_balance') or None,
         created_by=request.user,
     )
 
     return JsonResponse({
         'id': entry.id,
         'account': account.nick,
-        'platform': str(account.platform) if account.platform else '',
-        'deposit': str(entry.deposit) if entry.deposit else None,
-        'withdrawal': str(entry.withdrawal) if entry.withdrawal else None,
+        'amount': str(entry.amount),
+        'created_at': entry.created_at.strftime('%Y-%m-%d %H:%M'),
+    })
+
+
+@login_required
+def withdrawal_create(request):
+    """Create a withdrawal entry."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    import json
+    data = json.loads(request.body)
+    account_id = data.get('account_id')
+    amount = data.get('amount')
+
+    if not account_id:
+        return JsonResponse({'error': 'Account is required'}, status=400)
+    if not amount or float(amount) <= 0:
+        return JsonResponse({'error': 'Enter a valid amount'}, status=400)
+
+    account = get_object_or_404(AccountDetail, pk=account_id)
+    entry = Withdrawal.objects.create(
+        account=account,
+        network_id=data.get('network_id') or None,
+        wallet=data.get('wallet', ''),
+        amount=amount,
+        current_balance=data.get('current_balance') or None,
+        created_by=request.user,
+    )
+
+    return JsonResponse({
+        'id': entry.id,
+        'account': account.nick,
+        'amount': str(entry.amount),
         'created_at': entry.created_at.strftime('%Y-%m-%d %H:%M'),
     })
 
@@ -1151,39 +1198,55 @@ def deposit_withdrawal_history(request):
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
 
-    qs = DepositWithdrawal.objects.select_related('account', 'account__platform')
+    dep_qs = Deposit.objects.select_related('account', 'account__platform', 'network')
+    wd_qs = Withdrawal.objects.select_related('account', 'account__platform', 'network')
 
     if q:
-        qs = qs.filter(
-            Q(account__nick__icontains=q) | Q(account__security__api__icontains=q)
-        )
+        dep_qs = dep_qs.filter(Q(account__nick__icontains=q) | Q(account__security__api__icontains=q))
+        wd_qs = wd_qs.filter(Q(account__nick__icontains=q) | Q(account__security__api__icontains=q))
     if date_from:
-        qs = qs.filter(created_at__date__gte=date_from)
+        dep_qs = dep_qs.filter(created_at__date__gte=date_from)
+        wd_qs = wd_qs.filter(created_at__date__gte=date_from)
     if date_to:
-        qs = qs.filter(created_at__date__lte=date_to)
+        dep_qs = dep_qs.filter(created_at__date__lte=date_to)
+        wd_qs = wd_qs.filter(created_at__date__lte=date_to)
 
-    # Totals from the same filtered queryset
-    totals = qs.aggregate(
-        total_deposits=Sum('deposit'),
-        total_withdrawals=Sum('withdrawal'),
-    )
+    total_deposits = dep_qs.aggregate(total=Sum('amount'))['total'] or 0
+    total_withdrawals = wd_qs.aggregate(total=Sum('amount'))['total'] or 0
 
     entries = []
-    for e in qs:
+    for e in dep_qs:
         entries.append({
             'id': e.id,
+            'type': 'deposit',
             'account': e.account.nick,
             'platform': str(e.account.platform) if e.account.platform else '',
-            'deposit': str(e.deposit) if e.deposit else None,
-            'withdrawal': str(e.withdrawal) if e.withdrawal else None,
+            'network': e.network.name if e.network else '',
+            'wallet': e.wallet or '',
+            'amount': str(e.amount),
+            'current_balance': str(e.current_balance) if e.current_balance is not None else '',
             'created_at': e.created_at.strftime('%Y-%m-%d %H:%M'),
         })
+    for e in wd_qs:
+        entries.append({
+            'id': e.id,
+            'type': 'withdrawal',
+            'account': e.account.nick,
+            'platform': str(e.account.platform) if e.account.platform else '',
+            'network': e.network.name if e.network else '',
+            'wallet': e.wallet or '',
+            'amount': str(e.amount),
+            'current_balance': str(e.current_balance) if e.current_balance is not None else '',
+            'created_at': e.created_at.strftime('%Y-%m-%d %H:%M'),
+        })
+
+    entries.sort(key=lambda x: x['created_at'], reverse=True)
 
     return JsonResponse({
         'entries': entries,
         'totals': {
-            'deposits': str(totals['total_deposits'] or 0),
-            'withdrawals': str(totals['total_withdrawals'] or 0),
+            'deposits': str(total_deposits),
+            'withdrawals': str(total_withdrawals),
         }
     })
 

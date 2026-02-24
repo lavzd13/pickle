@@ -164,7 +164,7 @@
                             <div class="col-md-4">
                                 <p class="fw-semibold mb-1 mt-2">Payment</p>
                                 {% if account.payment %}
-                                <div><span class="text-muted">Withdrawal balance:</span> ${{ account.payment.min_balance }}</div>
+                                <div><span class="text-muted">Minimum Balance for Withdrawal:</span> ${{ account.payment.min_balance }}</div>
                                 <div>
                                     <span class="text-muted">Withdraw pass:</span> {{ account.payment.withdraw_pass|default:"-" }}
                                     {% if account.payment.withdraw_pass %}<button class="btn btn-link p-0 ms-1 copy-btn" onclick="copyText(event, '{{ account.payment.withdraw_pass|escapejs }}')" title="Copy"><i class="bi bi-clipboard"></i></button>{% endif %}

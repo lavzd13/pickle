@@ -44,7 +44,8 @@ urlpatterns = [
 
     # Deposit/Withdrawals
     path('deposit-withdrawal/', web_views.deposit_withdrawal, name='deposit_withdrawal'),
-    path('deposit-withdrawal/create/', web_views.deposit_withdrawal_create, name='deposit_withdrawal_create'),
+    path('deposit/create/', web_views.deposit_create, name='deposit_create'),
+    path('withdrawal/create/', web_views.withdrawal_create, name='withdrawal_create'),
     path('deposit-withdrawal/reports/', web_views.deposit_withdrawal_reports, name='deposit_withdrawal_reports'),
     path('deposit-withdrawal/history/', web_views.deposit_withdrawal_history, name='deposit_withdrawal_history'),
     path('account-search/', web_views.account_search, name='account_search'),

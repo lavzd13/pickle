@@ -181,6 +181,7 @@ class Payment(models.Model):
     min_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     crypto_wallet = models.CharField(blank=True)
     wallet_provider = models.ForeignKey(WalletProvider, on_delete=models.SET_NULL, null=True, blank=True)
+    network = models.ForeignKey(Network, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -271,18 +272,35 @@ class PlaySession(models.Model):
             return True
         return self.created_by == user
 
-class DepositWithdrawal(models.Model):
-    account = models.ForeignKey(AccountDetail, on_delete=models.CASCADE, related_name='deposit_withdrawals')
-    deposit = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    withdrawal = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='deposit_withdrawals')
+class Deposit(models.Model):
+    account = models.ForeignKey(AccountDetail, on_delete=models.CASCADE, related_name='deposits')
+    network = models.ForeignKey(Network, on_delete=models.SET_NULL, null=True, blank=True)
+    wallet = models.CharField(blank=True, default='')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    current_balance = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='deposits')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = "deposit_withdrawal"
+        db_table = 'deposit'
         ordering = ['-created_at']
 
     def __str__(self):
-        if self.deposit:
-            return f"{self.account.nick} +{self.deposit}"
-        return f"{self.account.nick} -{self.withdrawal}"
+        return f"{self.account.nick} +{self.amount}"
+
+
+class Withdrawal(models.Model):
+    account = models.ForeignKey(AccountDetail, on_delete=models.CASCADE, related_name='withdrawals')
+    network = models.ForeignKey(Network, on_delete=models.SET_NULL, null=True, blank=True)
+    wallet = models.CharField(blank=True, default='')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    current_balance = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='withdrawals')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'withdrawal'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.account.nick} -{self.amount}"
