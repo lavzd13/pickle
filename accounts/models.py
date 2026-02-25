@@ -272,12 +272,21 @@ class PlaySession(models.Model):
             return True
         return self.created_by == user
 
+DW_STATUS_CHOICES = [
+    ('pending', 'Pending'),
+    ('completed', 'Completed'),
+    ('cancelled', 'Cancelled'),
+]
+
+
 class Deposit(models.Model):
     account = models.ForeignKey(AccountDetail, on_delete=models.CASCADE, related_name='deposits')
     network = models.ForeignKey(Network, on_delete=models.SET_NULL, null=True, blank=True)
+    wallet_name = models.CharField(blank=True, default='')
     wallet = models.CharField(blank=True, default='')
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     current_balance = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    status = models.CharField(max_length=20, choices=DW_STATUS_CHOICES, default='pending')
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='deposits')
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -292,9 +301,11 @@ class Deposit(models.Model):
 class Withdrawal(models.Model):
     account = models.ForeignKey(AccountDetail, on_delete=models.CASCADE, related_name='withdrawals')
     network = models.ForeignKey(Network, on_delete=models.SET_NULL, null=True, blank=True)
+    wallet_name = models.CharField(blank=True, default='')
     wallet = models.CharField(blank=True, default='')
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     current_balance = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    status = models.CharField(max_length=20, choices=DW_STATUS_CHOICES, default='pending')
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='withdrawals')
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -304,3 +315,35 @@ class Withdrawal(models.Model):
 
     def __str__(self):
         return f"{self.account.nick} -{self.amount}"
+
+
+class DepositOrder(models.Model):
+    """Order submitted by a regular user — to be forwarded to the Telegram bot."""
+    account = models.ForeignKey(AccountDetail, on_delete=models.CASCADE, related_name='deposit_orders')
+    network = models.ForeignKey(Network, on_delete=models.SET_NULL, null=True, blank=True)
+    wallet_address = models.CharField(blank=True, default='')
+    current_balance = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='deposit_orders')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'deposit_order'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"DepositOrder {self.account.nick}"
+
+
+class WithdrawalOrder(models.Model):
+    """Order submitted by a regular user — to be forwarded to the Telegram bot."""
+    account = models.ForeignKey(AccountDetail, on_delete=models.CASCADE, related_name='withdrawal_orders')
+    current_balance = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='withdrawal_orders')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'withdrawal_order'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"WithdrawalOrder {self.account.nick}"
