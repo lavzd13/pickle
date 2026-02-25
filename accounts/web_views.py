@@ -852,15 +852,18 @@ def active_sessions(request):
     for s in done_qs:
         try:
             meta = _json.loads(s.notes or '{}')
-            r = int(meta.get('r', 0))
+            if 'remaining_after' in meta:
+                remaining_after = int(meta['remaining_after'])
+            else:
+                r = int(meta.get('r', 0))
+                start_dt = _dt.combine(today, s.start_time)
+                end_dt = _dt.combine(today, s.end_time)
+                if end_dt < start_dt:
+                    end_dt += timedelta(days=1)
+                actual_minutes = int((end_dt - start_dt).total_seconds() / 60)
+                remaining_after = max(0, r - actual_minutes)
         except Exception:
-            r = 0
-        start_dt = _dt.combine(today, s.start_time)
-        end_dt = _dt.combine(today, s.end_time)
-        if end_dt < start_dt:
-            end_dt += timedelta(days=1)
-        actual_minutes = int((end_dt - start_dt).total_seconds() / 60)
-        remaining_after = max(0, r - actual_minutes)
+            remaining_after = 0
         acc = s.account
         done_result.append({
             'session_id': s.id,
@@ -968,7 +971,7 @@ def finish_session_play(request):
     remaining_after = max(0, r - actual_minutes)
 
     session.is_active = False
-    session.notes = f"Given duration: {given_duration} min; Actual duration: {actual_minutes} min; Remaining: {remaining_after} min"
+    session.notes = _json.dumps({'d': given_duration, 'r': r, 'actual': actual_minutes, 'remaining_after': remaining_after})
     session.save(update_fields=['is_active', 'notes'])
 
     return JsonResponse({'ok': True})
@@ -1071,7 +1074,7 @@ def stop_session(request):
     session.is_done = True
     session.paused = False
     session.break_until = timezone.now() + timedelta(minutes=break_minutes)
-    session.notes = f"Given duration: {given_duration} min; Actual duration: {actual_minutes} min; Remaining: {remaining_after} min"
+    session.notes = _json.dumps({'d': given_duration, 'r': r, 'actual': actual_minutes, 'remaining_after': remaining_after})
     session.save(update_fields=['end_time', 'is_done', 'paused', 'break_until', 'notes'])
 
     return JsonResponse({'ok': True, 'remaining_after': remaining_after})
