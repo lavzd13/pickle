@@ -138,6 +138,7 @@
                 <div class="position-sticky pt-3">
                     <h5 class="text-white px-3 mb-3">Pickle</h5>
                     <ul class="nav flex-column">
+                        {% if user.is_superuser %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
                                 <i class="bi bi-speedometer2"></i> Dashboard
@@ -148,6 +149,7 @@
                                 <i class="bi bi-controller"></i> Sessions
                             </a>
                         </li>
+						{% endif %}
 						<li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'play' %}active{% endif %}" href="{% url 'play' %}">
                                 <i class="bi bi-controller"></i> Play

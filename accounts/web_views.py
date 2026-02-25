@@ -11,7 +11,7 @@ from django.utils import timezone
 from .models import PlaySession, AccountDetail, Payment, Location, Security, LastTransaction, PlayInfo, Deposit, Withdrawal, Network, DepositOrder, WithdrawalOrder
 from django.db.models import Sum
 from django.forms import modelformset_factory
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, Http404
 from .forms import PlaySessionForm, DaySessionForm, AccountDetailForm, PaymentForm, UserCreateForm, UserEditForm, PlatformForm, LocationForm, SecurityForm, LastTransactionForm
 
 
@@ -129,6 +129,7 @@ def _group_sessions_by_day(sessions):
 
 
 @login_required
+@user_passes_test(is_superuser)
 def dashboard(request):
     """Dashboard showing overview of sessions"""
     if request.user.is_superuser:
@@ -152,6 +153,7 @@ def dashboard(request):
 
 
 @login_required
+@user_passes_test(is_superuser)
 def session_list(request):
     """List all sessions accessible to the user"""
     if request.user.is_superuser:
@@ -1290,6 +1292,76 @@ def dw_entry_update(request):
         entry.wallet = data.get('wallet', entry.wallet)
         entry.status = data.get('status', entry.status)
         entry.save(update_fields=['amount', 'network_id', 'wallet_name', 'wallet', 'status'])
+    else:
+        return JsonResponse({'error': 'Invalid type'}, status=400)
+
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@user_passes_test(is_superuser)
+def deposit_new_page(request):
+    """Page for creating a new Deposit."""
+    networks = Network.objects.all()
+    return render(request, 'accounts/deposit_new.html', {'networks': networks})
+
+
+@login_required
+@user_passes_test(is_superuser)
+def withdrawal_new_page(request):
+    """Page for creating a new Withdrawal."""
+    return render(request, 'accounts/withdrawal_new.html')
+
+
+@login_required
+def deposit_order_new_page(request, account_id):
+    """Page for creating a new Deposit Order (regular user flow)."""
+    account = get_object_or_404(AccountDetail, pk=account_id)
+    networks = Network.objects.all()
+    return render(request, 'accounts/deposit_order_new.html', {'account': account, 'networks': networks})
+
+
+@login_required
+def withdrawal_order_new_page(request, account_id):
+    """Page for creating a new Withdrawal Order (regular user flow)."""
+    account = get_object_or_404(AccountDetail, pk=account_id)
+    return render(request, 'accounts/withdrawal_order_new.html', {'account': account})
+
+
+@login_required
+@user_passes_test(is_superuser)
+def dw_entry_page(request, entry_type, pk):
+    """Detail/edit page for a single Deposit or Withdrawal."""
+    if entry_type == 'deposit':
+        entry = get_object_or_404(Deposit, pk=pk)
+    elif entry_type == 'withdrawal':
+        entry = get_object_or_404(Withdrawal, pk=pk)
+    else:
+        raise Http404
+    networks = Network.objects.all()
+    return render(request, 'accounts/dw_entry_detail.html', {
+        'entry': entry,
+        'entry_type': entry_type,
+        'networks': networks,
+    })
+
+
+@login_required
+@user_passes_test(is_superuser)
+def dw_entry_delete(request):
+    """Delete a Deposit or Withdrawal entry."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    import json
+    data = json.loads(request.body)
+    entry_type = data.get('type')
+    entry_id = data.get('id')
+
+    if entry_type == 'deposit':
+        get_object_or_404(Deposit, pk=entry_id).delete()
+    elif entry_type == 'withdrawal':
+        get_object_or_404(Withdrawal, pk=entry_id).delete()
     else:
         return JsonResponse({'error': 'Invalid type'}, status=400)
 

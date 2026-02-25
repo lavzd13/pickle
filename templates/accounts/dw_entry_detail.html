@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+{% block title %}{{ entry_type|title }} Details{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 600px;">
+
+    <div class="d-flex align-items-center gap-3 mb-4">
+        <a href="{% url 'deposit_withdrawal_reports' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <h4 class="mb-0 fw-semibold">
+            {% if entry_type == 'deposit' %}
+            <i class="bi bi-arrow-down-circle me-2 text-danger"></i>Deposit
+            {% else %}
+            <i class="bi bi-arrow-up-circle me-2 text-success"></i>Withdrawal
+            {% endif %}
+        </h4>
+    </div>
+
+    <!-- Account info -->
+    <div class="row g-2 mb-3">
+        <div class="col-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body py-2">
+                    <div class="text-muted" style="font-size:.72rem;">Account</div>
+                    <div class="fw-semibold">{{ entry.account.nick }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body py-2">
+                    <div class="text-muted" style="font-size:.72rem;">Platform</div>
+                    <div>{{ entry.account.platform|default:"—" }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit form -->
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label text-muted small">Network</label>
+                <select id="f-network" class="form-select">
+                    <option value="">— None —</option>
+                    {% for n in networks %}
+                    <option value="{{ n.id }}" {% if entry.network_id == n.id %}selected{% endif %}>{{ n.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label text-muted small">Amount</label>
+                <input type="number" id="f-amount" class="form-control" step="0.01" min="0"
+                       value="{{ entry.amount }}">
+            </div>
+            <div class="mb-3">
+                <label class="form-label text-muted small">Wallet Name</label>
+                <input type="text" id="f-wallet-name" class="form-control"
+                       value="{{ entry.wallet_name }}">
+            </div>
+            <div class="mb-3">
+                <label class="form-label text-muted small">Wallet Address</label>
+                <input type="text" id="f-wallet-address" class="form-control"
+                       value="{{ entry.wallet }}">
+            </div>
+            <div class="mb-3">
+                <label class="form-label text-muted small">Status</label>
+                <select id="f-status" class="form-select">
+                    <option value="pending" {% if entry.status == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="completed" {% if entry.status == 'completed' %}selected{% endif %}>Completed</option>
+                    <option value="cancelled" {% if entry.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                </select>
+            </div>
+            <div id="form-error" class="alert alert-danger py-2" style="display:none;"></div>
+            <div class="d-flex gap-2">
+                <a href="{% url 'deposit_withdrawal_reports' %}" class="btn btn-outline-secondary flex-fill">Cancel</a>
+                <button type="button" id="btn-save" class="btn btn-primary flex-fill">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Danger zone -->
+    <div class="card border-danger border-0 shadow-sm">
+        <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+                <div class="fw-semibold text-danger small">Delete this record</div>
+                <div class="text-muted" style="font-size:.8rem;">This action cannot be undone.</div>
+            </div>
+            <button type="button" id="btn-delete" class="btn btn-outline-danger btn-sm">
+                <i class="bi bi-trash"></i> Delete
+            </button>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function getCsrf() {
+    return document.cookie.split('; ').find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
+}
+
+document.getElementById('btn-save').addEventListener('click', function () {
+    var errDiv = document.getElementById('form-error');
+    errDiv.style.display = 'none';
+
+    var amount = document.getElementById('f-amount').value;
+    if (!amount || parseFloat(amount) <= 0) {
+        errDiv.textContent = 'Enter a valid amount';
+        errDiv.style.display = '';
+        return;
+    }
+
+    var networkId = document.getElementById('f-network').value;
+    this.disabled = true;
+
+    fetch('/dw-entry/update/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+        body: JSON.stringify({
+            type: '{{ entry_type }}',
+            id: {{ entry.id }},
+            amount: parseFloat(amount),
+            network_id: networkId ? parseInt(networkId) : null,
+            wallet_name: document.getElementById('f-wallet-name').value.trim(),
+            wallet: document.getElementById('f-wallet-address').value.trim(),
+            status: document.getElementById('f-status').value,
+        }),
+    })
+    .then(r => r.json())
+    .then(function (data) {
+        document.getElementById('btn-save').disabled = false;
+        if (data.error) { errDiv.textContent = data.error; errDiv.style.display = ''; return; }
+        window.location.href = '{% url "deposit_withdrawal_reports" %}';
+    })
+    .catch(function () {
+        document.getElementById('btn-save').disabled = false;
+        errDiv.textContent = 'An error occurred. Please try again.';
+        errDiv.style.display = '';
+    });
+});
+
+document.getElementById('btn-delete').addEventListener('click', function () {
+    if (!confirm('Delete this record permanently?')) return;
+    this.disabled = true;
+
+    fetch('/dw-entry/delete/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+        body: JSON.stringify({ type: '{{ entry_type }}', id: {{ entry.id }} }),
+    })
+    .then(r => r.json())
+    .then(function (data) {
+        if (data.error) {
+            document.getElementById('btn-delete').disabled = false;
+            alert(data.error);
+            return;
+        }
+        window.location.href = '{% url "deposit_withdrawal_reports" %}';
+    })
+    .catch(function () {
+        document.getElementById('btn-delete').disabled = false;
+        alert('An error occurred. Please try again.');
+    });
+});
+</script>
+{% endblock %}

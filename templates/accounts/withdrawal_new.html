@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+{% block title %}New Withdrawal{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 600px;">
+
+    <div class="d-flex align-items-center gap-3 mb-4">
+        <a href="{% url 'deposit_withdrawal_reports' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <h4 class="mb-0 fw-semibold"><i class="bi bi-arrow-up-circle me-2 text-success"></i>New Withdrawal</h4>
+    </div>
+
+    <!-- Account search -->
+    <div class="card border-0 shadow-sm mb-3" id="search-card">
+        <div class="card-body position-relative">
+            <label class="form-label text-muted small mb-1">Account</label>
+            <input type="text" id="account-search" class="form-control"
+                   placeholder="Search by nickname or API key..." autocomplete="off">
+            <div id="search-results" class="list-group position-absolute shadow"
+                 style="z-index:100; display:none; max-height:250px; overflow-y:auto; left:1rem; right:1rem;"></div>
+        </div>
+    </div>
+
+    <div id="selected-account-bar" class="alert alert-secondary d-flex justify-content-between align-items-center py-2 mb-3" style="display:none !important;">
+        <span class="fw-semibold" id="selected-name"></span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-change">Change</button>
+    </div>
+
+    <!-- Form -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label text-muted small">Amount</label>
+                <input type="number" id="f-amount" class="form-control" step="0.01" min="0" placeholder="0.00">
+            </div>
+            <div id="form-error" class="alert alert-danger py-2" style="display:none;"></div>
+            <div class="d-flex gap-2">
+                <a href="{% url 'deposit_withdrawal_reports' %}" class="btn btn-outline-secondary flex-fill">Cancel</a>
+                <button type="button" id="btn-submit" class="btn btn-success flex-fill">Record Withdrawal</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function getCsrf() {
+    return document.cookie.split('; ').find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
+}
+
+var selectedAccountId = null;
+var searchTimer = null;
+var searchInput = document.getElementById('account-search');
+var resultsDiv = document.getElementById('search-results');
+
+searchInput.addEventListener('input', function () {
+    clearTimeout(searchTimer);
+    var q = this.value.trim();
+    if (q.length < 1) { resultsDiv.style.display = 'none'; return; }
+    searchTimer = setTimeout(function () {
+        fetch('/account-search/?q=' + encodeURIComponent(q))
+            .then(r => r.json())
+            .then(function (data) {
+                resultsDiv.innerHTML = '';
+                if (!data.results.length) {
+                    resultsDiv.innerHTML = '<div class="list-group-item text-muted">No accounts found</div>';
+                    resultsDiv.style.display = '';
+                    return;
+                }
+                data.results.forEach(function (acc) {
+                    var item = document.createElement('a');
+                    item.href = '#';
+                    item.className = 'list-group-item list-group-item-action py-2';
+                    item.textContent = acc.nick + (acc.platform ? ' (' + acc.platform + ')' : '');
+                    item.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        selectedAccountId = acc.id;
+                        document.getElementById('selected-name').textContent =
+                            acc.nick + (acc.platform ? ' (' + acc.platform + ')' : '');
+                        document.getElementById('selected-account-bar').style.display = 'flex';
+                        document.getElementById('search-card').style.display = 'none';
+                        resultsDiv.style.display = 'none';
+                    });
+                    resultsDiv.appendChild(item);
+                });
+                resultsDiv.style.display = '';
+            });
+    }, 250);
+});
+
+document.addEventListener('click', function (e) {
+    if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target))
+        resultsDiv.style.display = 'none';
+});
+
+document.getElementById('btn-change').addEventListener('click', function () {
+    selectedAccountId = null;
+    searchInput.value = '';
+    document.getElementById('selected-account-bar').style.display = 'none';
+    document.getElementById('search-card').style.display = '';
+    searchInput.focus();
+});
+
+document.getElementById('btn-submit').addEventListener('click', function () {
+    var errDiv = document.getElementById('form-error');
+    errDiv.style.display = 'none';
+
+    if (!selectedAccountId) {
+        errDiv.textContent = 'Please select an account';
+        errDiv.style.display = '';
+        return;
+    }
+    var amount = document.getElementById('f-amount').value;
+    if (!amount || parseFloat(amount) <= 0) {
+        errDiv.textContent = 'Enter a valid amount';
+        errDiv.style.display = '';
+        return;
+    }
+
+    this.disabled = true;
+
+    fetch('/withdrawal/create/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+        body: JSON.stringify({
+            account_id: selectedAccountId,
+            amount: parseFloat(amount),
+        }),
+    })
+    .then(r => r.json())
+    .then(function (data) {
+        if (data.error) {
+            document.getElementById('btn-submit').disabled = false;
+            errDiv.textContent = data.error;
+            errDiv.style.display = '';
+            return;
+        }
+        window.location.href = '{% url "deposit_withdrawal_reports" %}';
+    })
+    .catch(function () {
+        document.getElementById('btn-submit').disabled = false;
+        errDiv.textContent = 'An error occurred. Please try again.';
+        errDiv.style.display = '';
+    });
+});
+</script>
+{% endblock %}
