@@ -64,6 +64,7 @@ class AccountDetail(models.Model):
     is_active = models.BooleanField(default=False)
     is_inactive = models.BooleanField(default=False)
     is_banned = models.BooleanField(default=False)
+    creation_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

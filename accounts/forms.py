@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib.auth.models import User
+from django.utils import timezone
 from .models import PlaySession, AccountDetail, Payment, Platform, PlayInfo, WalletProvider, Network, LastTransaction, Location, Security, ProxyVpn
 
 
@@ -82,17 +83,20 @@ class AccountDetailForm(forms.ModelForm):
 
     class Meta:
         model = AccountDetail
-        fields = ['nick', 'device_name', 'email', 'platform', 'phone']
+        fields = ['nick', 'device_name', 'email', 'platform', 'phone', 'creation_date']
         widgets = {
             'nick': forms.TextInput(attrs={'class': 'form-control'}),
             'device_name': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'platform': forms.Select(attrs={'class': 'form-control'}),
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
+            'creation_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if not self.instance.pk and not self.initial.get('creation_date'):
+            self.fields['creation_date'].initial = timezone.localdate()
         if self.instance and self.instance.pk:
             if self.instance.is_active:
                 self.fields['account_status'].initial = 'is_active'
