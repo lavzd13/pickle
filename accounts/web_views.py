@@ -791,12 +791,21 @@ def active_sessions(request):
             created_by=request.user
         ).select_related('account', 'account__payment')
 
-    # Pending and done are always the current user's own sessions
-    own_qs = PlaySession.objects.filter(
-        session_date=today, is_active=True, created_by=request.user
+    # Pending: always the current user's own sessions
+    pending_qs = PlaySession.objects.filter(
+        session_date=today, is_active=True, is_pending=True, created_by=request.user
     ).select_related('account', 'account__payment')
-    pending_qs = own_qs.filter(is_pending=True)
-    done_qs = own_qs.filter(is_pending=False, is_done=True)
+
+    # Done: superusers see all done sessions; others see own only
+    if request.user.is_superuser:
+        done_qs = PlaySession.objects.filter(
+            session_date=today, is_active=True, is_pending=False, is_done=True
+        ).select_related('account', 'account__payment', 'created_by')
+    else:
+        done_qs = PlaySession.objects.filter(
+            session_date=today, is_active=True, is_pending=False, is_done=True,
+            created_by=request.user
+        ).select_related('account', 'account__payment')
 
     result = []
     for s in playing_qs:
@@ -926,7 +935,10 @@ def dismiss_session(request):
     data = json.loads(request.body)
     session_id = data.get('session_id')
 
-    PlaySession.objects.filter(pk=session_id, is_done=True, created_by=request.user).update(is_active=False)
+    qs = PlaySession.objects.filter(pk=session_id, is_done=True)
+    if not request.user.is_superuser:
+        qs = qs.filter(created_by=request.user)
+    qs.update(is_active=False)
     return JsonResponse({'ok': True})
 
 
