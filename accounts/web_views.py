@@ -8,7 +8,7 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db.models import Count, Q
 from django.utils import timezone
-from .models import PlaySession, AccountDetail, Payment, Location, Security, LastTransaction, PlayInfo, Deposit, Withdrawal, Network
+from .models import PlaySession, AccountDetail, Payment, Location, Security, LastTransaction, PlayInfo, Deposit, Withdrawal, Network, DepositOrder, WithdrawalOrder
 from django.db.models import Sum
 from django.forms import modelformset_factory
 from django.http import JsonResponse, HttpResponse
@@ -1071,7 +1071,13 @@ def account_search(request):
         return JsonResponse({'results': []})
 
     qs = AccountDetail.objects.select_related('platform')
-    if not request.user.is_superuser:
+    if request.GET.get('eligible'):
+        today_name = timezone.localdate().strftime('%A')
+        qs = qs.filter(
+            is_active=True,
+            **{f'play_info__schedule_of_the_week__{today_name}__gt': 0}
+        )
+    elif not request.user.is_superuser:
         qs = qs.filter(play_sessions__created_by=request.user).distinct()
 
     # Search by nick OR by API (left outer join via isnull handles missing Security)
@@ -1135,6 +1141,7 @@ def deposit_create(request):
     entry = Deposit.objects.create(
         account=account,
         network_id=data.get('network_id') or None,
+        wallet_name=data.get('wallet_name', ''),
         wallet=data.get('wallet', ''),
         amount=amount,
         current_balance=data.get('current_balance') or None,
@@ -1166,10 +1173,26 @@ def withdrawal_create(request):
         return JsonResponse({'error': 'Enter a valid amount'}, status=400)
 
     account = get_object_or_404(AccountDetail, pk=account_id)
+
+    # Auto-populate wallet info from account's payment model
+    pay_network_id = None
+    pay_wallet = ''
+    pay_wallet_name = ''
+    try:
+        payment = account.payment
+        if payment.network_id:
+            pay_network_id = payment.network_id
+        pay_wallet = payment.crypto_wallet or ''
+        if payment.wallet_provider:
+            pay_wallet_name = payment.wallet_provider.name
+    except Exception:
+        pass
+
     entry = Withdrawal.objects.create(
         account=account,
-        network_id=data.get('network_id') or None,
-        wallet=data.get('wallet', ''),
+        network_id=pay_network_id,
+        wallet_name=pay_wallet_name,
+        wallet=pay_wallet,
         amount=amount,
         current_balance=data.get('current_balance') or None,
         created_by=request.user,
@@ -1184,10 +1207,101 @@ def withdrawal_create(request):
 
 
 @login_required
+def deposit_order_create(request):
+    """Create a deposit order (regular user flow, stored for later Telegram bot dispatch)."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    import json
+    data = json.loads(request.body)
+    account_id = data.get('account_id')
+
+    if not account_id:
+        return JsonResponse({'error': 'Account is required'}, status=400)
+
+    account = get_object_or_404(AccountDetail, pk=account_id)
+    order = DepositOrder.objects.create(
+        account=account,
+        network_id=data.get('network_id') or None,
+        wallet_address=data.get('wallet_address', ''),
+        current_balance=data.get('current_balance') or None,
+        created_by=request.user,
+    )
+
+    return JsonResponse({
+        'id': order.id,
+        'account': account.nick,
+        'created_at': order.created_at.strftime('%Y-%m-%d %H:%M'),
+    })
+
+
+@login_required
+def withdrawal_order_create(request):
+    """Create a withdrawal order (regular user flow, stored for later Telegram bot dispatch)."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    import json
+    data = json.loads(request.body)
+    account_id = data.get('account_id')
+
+    if not account_id:
+        return JsonResponse({'error': 'Account is required'}, status=400)
+
+    account = get_object_or_404(AccountDetail, pk=account_id)
+    order = WithdrawalOrder.objects.create(
+        account=account,
+        current_balance=data.get('current_balance') or None,
+        created_by=request.user,
+    )
+
+    return JsonResponse({
+        'id': order.id,
+        'account': account.nick,
+        'created_at': order.created_at.strftime('%Y-%m-%d %H:%M'),
+    })
+
+
+@login_required
+@user_passes_test(is_superuser)
+def dw_entry_update(request):
+    """Update a Deposit or Withdrawal entry (status, amount, network, wallet fields)."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    import json
+    data = json.loads(request.body)
+    entry_type = data.get('type')
+    entry_id = data.get('id')
+
+    if entry_type == 'deposit':
+        entry = get_object_or_404(Deposit, pk=entry_id)
+        entry.amount = data.get('amount', entry.amount)
+        entry.network_id = data.get('network_id') or None
+        entry.wallet_name = data.get('wallet_name', entry.wallet_name)
+        entry.wallet = data.get('wallet', entry.wallet)
+        entry.status = data.get('status', entry.status)
+        entry.save(update_fields=['amount', 'network_id', 'wallet_name', 'wallet', 'status'])
+    elif entry_type == 'withdrawal':
+        entry = get_object_or_404(Withdrawal, pk=entry_id)
+        entry.amount = data.get('amount', entry.amount)
+        entry.network_id = data.get('network_id') or None
+        entry.wallet_name = data.get('wallet_name', entry.wallet_name)
+        entry.wallet = data.get('wallet', entry.wallet)
+        entry.status = data.get('status', entry.status)
+        entry.save(update_fields=['amount', 'network_id', 'wallet_name', 'wallet', 'status'])
+    else:
+        return JsonResponse({'error': 'Invalid type'}, status=400)
+
+    return JsonResponse({'ok': True})
+
+
+@login_required
 @user_passes_test(is_superuser)
 def deposit_withdrawal_reports(request):
-    """Reports page — superuser only."""
-    return render(request, 'accounts/deposit_withdrawal_reports.html')
+    """Combined D/W page — superuser only."""
+    networks = Network.objects.all()
+    return render(request, 'accounts/deposit_withdrawal_reports.html', {'networks': networks})
 
 
 @login_required
@@ -1197,6 +1311,7 @@ def deposit_withdrawal_history(request):
     q = request.GET.get('q', '').strip()
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
+    status = request.GET.get('status', '').strip()
 
     dep_qs = Deposit.objects.select_related('account', 'account__platform', 'network')
     wd_qs = Withdrawal.objects.select_related('account', 'account__platform', 'network')
@@ -1210,6 +1325,9 @@ def deposit_withdrawal_history(request):
     if date_to:
         dep_qs = dep_qs.filter(created_at__date__lte=date_to)
         wd_qs = wd_qs.filter(created_at__date__lte=date_to)
+    if status:
+        dep_qs = dep_qs.filter(status=status)
+        wd_qs = wd_qs.filter(status=status)
 
     total_deposits = dep_qs.aggregate(total=Sum('amount'))['total'] or 0
     total_withdrawals = wd_qs.aggregate(total=Sum('amount'))['total'] or 0
@@ -1222,9 +1340,11 @@ def deposit_withdrawal_history(request):
             'account': e.account.nick,
             'platform': str(e.account.platform) if e.account.platform else '',
             'network': e.network.name if e.network else '',
+            'network_id': e.network_id,
+            'wallet_name': e.wallet_name or '',
             'wallet': e.wallet or '',
             'amount': str(e.amount),
-            'current_balance': str(e.current_balance) if e.current_balance is not None else '',
+            'status': e.status,
             'created_at': e.created_at.strftime('%Y-%m-%d %H:%M'),
         })
     for e in wd_qs:
@@ -1234,9 +1354,11 @@ def deposit_withdrawal_history(request):
             'account': e.account.nick,
             'platform': str(e.account.platform) if e.account.platform else '',
             'network': e.network.name if e.network else '',
+            'network_id': e.network_id,
+            'wallet_name': e.wallet_name or '',
             'wallet': e.wallet or '',
             'amount': str(e.amount),
-            'current_balance': str(e.current_balance) if e.current_balance is not None else '',
+            'status': e.status,
             'created_at': e.created_at.strftime('%Y-%m-%d %H:%M'),
         })
 

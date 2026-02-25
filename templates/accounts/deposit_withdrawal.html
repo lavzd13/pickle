@@ -1,63 +1,66 @@
 {% extends 'base.html' %}
 
-{% block title %}Deposit/Withdrawal{% endblock %}
+{% block title %}Order{% endblock %}
 
 {% block content %}
-<div class="container py-4" style="max-width: 600px;">
+<div class="container py-4" style="max-width: 560px;">
 
-    <h3 class="mb-4"><i class="bi bi-cash-stack"></i> Deposit / Withdrawal</h3>
+    <h4 class="mb-4 fw-semibold"><i class="bi bi-inbox me-2"></i>Order</h4>
 
-    <!-- Search bar -->
-    <div class="card mb-4" id="search-card">
+    <!-- Account search -->
+    <div class="card border-0 shadow-sm mb-3" id="search-card">
         <div class="card-body position-relative">
-            <label class="form-label fw-bold">Search account by nickname or API</label>
-            <input type="text" id="account-search" class="form-control form-control-lg" placeholder="Type nickname or API key..." autocomplete="off">
-            <div id="search-results" class="list-group position-absolute w-100 shadow" style="z-index:100; display:none; max-height:280px; overflow-y:auto; left:0; padding: 0 1rem;"></div>
+            <label class="form-label text-muted small mb-1">Search account</label>
+            <input type="text" id="account-search" class="form-control form-control-lg"
+                   placeholder="Type nickname or API key..." autocomplete="off">
+            <div id="search-results" class="list-group position-absolute shadow"
+                 style="z-index:100; display:none; max-height:280px; overflow-y:auto;
+                        left:1rem; right:1rem;"></div>
         </div>
     </div>
 
-    <!-- Selected account card (hidden until selected) -->
+    <!-- Selected account card -->
     <div id="account-card" style="display:none;">
-        <div class="card mb-3">
+        <div class="card border-0 shadow-sm mb-3">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start mb-3">
                     <div>
-                        <h4 class="mb-1" id="card-nick"></h4>
-                        <span class="text-muted" id="card-platform"></span>
-                        <div class="text-muted small mt-1" id="card-api"></div>
+                        <h5 class="mb-0 fw-semibold" id="card-nick"></h5>
+                        <span class="text-muted small" id="card-platform"></span>
                     </div>
                     <button class="btn btn-sm btn-outline-secondary" id="btn-change">
                         <i class="bi bi-arrow-left"></i> Change
                     </button>
                 </div>
-                <div class="d-flex gap-3">
-                    <button class="btn btn-danger btn-lg flex-fill" id="btn-deposit">
-                        <i class="bi bi-arrow-down-circle"></i> Deposit
+                <div class="d-flex gap-2">
+                    <button class="btn btn-danger flex-fill py-2" id="btn-deposit">
+                        <i class="bi bi-arrow-down-circle me-1"></i> Deposit
                     </button>
-                    <button class="btn btn-success btn-lg flex-fill" id="btn-withdraw">
-                        <i class="bi bi-arrow-up-circle"></i> Withdraw
+                    <button class="btn btn-success flex-fill py-2" id="btn-withdraw">
+                        <i class="bi bi-arrow-up-circle me-1"></i> Withdrawal
                     </button>
                 </div>
-                <div id="form-success" class="alert alert-success mt-3 mb-0" style="display:none;"></div>
+                <div id="form-success" class="alert alert-success mt-3 mb-0 py-2" style="display:none;"></div>
             </div>
         </div>
     </div>
 
 </div>
 
-<!-- Deposit/Withdrawal modal -->
-<div class="modal fade" id="amount-modal" tabindex="-1">
+<!-- Order modal -->
+<div class="modal fade" id="order-modal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modal-title">Enter Details</h5>
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom-0 pb-2">
+                <h5 class="modal-title fw-semibold" id="modal-title">Order</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body pt-0">
+
                 <!-- Deposit-only fields -->
                 <div id="deposit-fields">
                     <div class="mb-3">
-                        <label class="form-label">Network</label>
+                        <label class="form-label text-muted small">Network</label>
                         <select id="modal-network" class="form-select">
                             <option value="">— Select network —</option>
                             {% for n in networks %}
@@ -65,31 +68,25 @@
                             {% endfor %}
                         </select>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Wallet Address</label>
+                        <input type="text" id="modal-wallet-address" class="form-control"
+                               placeholder="0xN13Bvsd...">
+                    </div>
                 </div>
-                <!-- Shared fields -->
+
+                <!-- Shared: Current Balance -->
                 <div class="mb-3">
-                    <label class="form-label">Amount</label>
-                    <input type="number" id="modal-amount" class="form-control" step="0.01" min="0" placeholder="0.00">
+                    <label class="form-label text-muted small" id="balance-label">Current Balance</label>
+                    <input type="number" id="modal-balance" class="form-control"
+                           step="0.01" min="0" placeholder="0.00">
                 </div>
-                <!-- Deposit-only fields (continued) -->
-                <div id="deposit-address-field" class="mb-3">
-                    <label class="form-label">Wallet address/name from which we deposited</label>
-                    <input type="text" id="modal-wallet" class="form-control" placeholder="0xN13Bvsd.../MEXC user">
-                </div>
-                <div id="deposit-balance-field" class="mb-3">
-                    <label class="form-label">Current Balance</label>
-                    <input type="number" id="modal-deposit-balance" class="form-control" step="0.01" min="0" placeholder="0.00">
-                </div>
-                <!-- Withdrawal-only fields -->
-                <div id="withdrawal-fields" class="mb-3">
-                    <label class="form-label">Acc. balance after withdraw</label>
-                    <input type="number" id="modal-balance" class="form-control" step="0.01" min="0" placeholder="0.00">
-                </div>
-                <div id="modal-error" class="text-danger" style="display:none;"></div>
+
+                <div id="modal-error" class="alert alert-danger py-2 mb-0" style="display:none;"></div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="modal-confirm">Confirm</button>
+            <div class="modal-footer border-top-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary px-4" id="modal-confirm">Submit</button>
             </div>
         </div>
     </div>
@@ -108,31 +105,29 @@ var currentAction = null;
 var searchTimer = null;
 var searchInput = document.getElementById('account-search');
 var resultsDiv = document.getElementById('search-results');
-var amountModal = new bootstrap.Modal(document.getElementById('amount-modal'));
+var orderModal = new bootstrap.Modal(document.getElementById('order-modal'));
 
-// --- Search ---
+// ── Account search (eligible accounts only) ─────────────────────────────────
 searchInput.addEventListener('input', function () {
     clearTimeout(searchTimer);
     var q = this.value.trim();
     if (q.length < 1) { resultsDiv.style.display = 'none'; return; }
 
     searchTimer = setTimeout(function () {
-        fetch('/account-search/?q=' + encodeURIComponent(q))
-            .then(function (r) { return r.json(); })
+        fetch('/account-search/?eligible=1&q=' + encodeURIComponent(q))
+            .then(r => r.json())
             .then(function (data) {
                 resultsDiv.innerHTML = '';
                 if (!data.results.length) {
-                    resultsDiv.innerHTML = '<div class="list-group-item text-muted">No accounts found</div>';
+                    resultsDiv.innerHTML = '<div class="list-group-item text-muted py-2">No accounts found</div>';
                     resultsDiv.style.display = '';
                     return;
                 }
                 data.results.forEach(function (acc) {
                     var item = document.createElement('a');
                     item.href = '#';
-                    item.className = 'list-group-item list-group-item-action';
-                    var label = acc.nick + ' (' + (acc.platform || 'N/A') + ')';
-                    if (acc.api) label += '  —  API: ' + acc.api;
-                    item.textContent = label;
+                    item.className = 'list-group-item list-group-item-action py-2';
+                    item.textContent = acc.nick + (acc.platform ? '  (' + acc.platform + ')' : '');
                     item.addEventListener('click', function (e) {
                         e.preventDefault();
                         selectAccount(acc);
@@ -145,20 +140,15 @@ searchInput.addEventListener('input', function () {
 });
 
 document.addEventListener('click', function (e) {
-    if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) {
+    if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target))
         resultsDiv.style.display = 'none';
-    }
 });
 
-// --- Select / Change account ---
-var selectedAccount = null;
-
+// ── Select / Change account ─────────────────────────────────────────────────
 function selectAccount(acc) {
-    selectedAccount = acc;
     selectedAccountId = acc.id;
     document.getElementById('card-nick').textContent = acc.nick;
     document.getElementById('card-platform').textContent = acc.platform || '';
-    document.getElementById('card-api').textContent = acc.api ? 'API: ' + acc.api : '';
     document.getElementById('account-card').style.display = '';
     document.getElementById('search-card').style.display = 'none';
     document.getElementById('form-success').style.display = 'none';
@@ -167,93 +157,86 @@ function selectAccount(acc) {
 }
 
 document.getElementById('btn-change').addEventListener('click', function () {
-    selectedAccount = null;
     selectedAccountId = null;
     document.getElementById('account-card').style.display = 'none';
     document.getElementById('search-card').style.display = '';
     searchInput.focus();
 });
 
-// --- Deposit / Withdraw buttons open modal ---
+// ── Open modal ──────────────────────────────────────────────────────────────
 document.getElementById('btn-deposit').addEventListener('click', function () {
-    currentAction = 'deposit';
-    document.getElementById('modal-title').textContent = 'Deposit';
-    document.getElementById('modal-confirm').className = 'btn btn-danger';
-    openModal();
+    openModal('deposit');
 });
-
 document.getElementById('btn-withdraw').addEventListener('click', function () {
-    currentAction = 'withdrawal';
-    document.getElementById('modal-title').textContent = 'Withdrawal';
-    document.getElementById('modal-confirm').className = 'btn btn-success';
-    openModal();
+    openModal('withdrawal');
 });
 
-function openModal() {
-    var isDeposit = currentAction === 'deposit';
+function openModal(action) {
+    currentAction = action;
+    var isDeposit = action === 'deposit';
+
+    document.getElementById('modal-title').textContent = isDeposit ? 'Deposit Order' : 'Withdrawal Order';
+    document.getElementById('modal-confirm').className = 'btn px-4 ' + (isDeposit ? 'btn-danger' : 'btn-success');
     document.getElementById('deposit-fields').style.display = isDeposit ? '' : 'none';
-    document.getElementById('deposit-address-field').style.display = isDeposit ? '' : 'none';
-    document.getElementById('deposit-balance-field').style.display = isDeposit ? '' : 'none';
-    document.getElementById('withdrawal-fields').style.display = isDeposit ? 'none' : '';
+    document.getElementById('balance-label').textContent = isDeposit ? 'Current Balance' : 'Current Balance';
 
     document.getElementById('modal-network').value = '';
-    document.getElementById('modal-wallet').value = '';
-    document.getElementById('modal-amount').value = '';
-    document.getElementById('modal-deposit-balance').value = '';
+    document.getElementById('modal-wallet-address').value = '';
     document.getElementById('modal-balance').value = '';
     document.getElementById('modal-error').style.display = 'none';
-    amountModal.show();
-    setTimeout(function () { document.getElementById('modal-amount').focus(); }, 300);
+
+    orderModal.show();
+    setTimeout(function () { document.getElementById('modal-balance').focus(); }, 350);
 }
 
-// --- Confirm ---
-document.getElementById('modal-confirm').addEventListener('click', submitEntry);
-document.getElementById('modal-amount').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') submitEntry();
-});
+// ── Submit ──────────────────────────────────────────────────────────────────
+document.getElementById('modal-confirm').addEventListener('click', submitOrder);
 
-function submitEntry() {
-    var amount = document.getElementById('modal-amount').value;
+function submitOrder() {
     var errDiv = document.getElementById('modal-error');
     errDiv.style.display = 'none';
 
-    if (!amount || parseFloat(amount) <= 0) {
-        errDiv.textContent = 'Enter a valid amount';
+    var balance = document.getElementById('modal-balance').value;
+    if (!balance || parseFloat(balance) < 0) {
+        errDiv.textContent = 'Enter a valid balance';
         errDiv.style.display = '';
         return;
     }
 
-    var url = currentAction === 'deposit' ? '/deposit/create/' : '/withdrawal/create/';
-    var body = { account_id: selectedAccountId, amount: parseFloat(amount) };
+    var url = currentAction === 'deposit' ? '/deposit-order/create/' : '/withdrawal-order/create/';
+    var body = {
+        account_id: selectedAccountId,
+        current_balance: parseFloat(balance),
+    };
 
     if (currentAction === 'deposit') {
         var networkId = document.getElementById('modal-network').value;
-        var wallet = document.getElementById('modal-wallet').value.trim();
-        var depBalance = document.getElementById('modal-deposit-balance').value;
         body.network_id = networkId ? parseInt(networkId) : null;
-        body.wallet = wallet;
-        body.current_balance = depBalance ? parseFloat(depBalance) : null;
-    } else {
-        var balance = document.getElementById('modal-balance').value;
-        body.current_balance = balance ? parseFloat(balance) : null;
+        body.wallet_address = document.getElementById('modal-wallet-address').value.trim();
     }
+
+    document.getElementById('modal-confirm').disabled = true;
 
     fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
     })
-    .then(function (r) { return r.json(); })
+    .then(r => r.json())
     .then(function (data) {
+        document.getElementById('modal-confirm').disabled = false;
         if (data.error) { errDiv.textContent = data.error; errDiv.style.display = ''; return; }
-        amountModal.hide();
+        orderModal.hide();
         var successDiv = document.getElementById('form-success');
-        var msg = currentAction === 'deposit'
-            ? 'Deposit of ' + data.amount + ' recorded'
-            : 'Withdrawal of ' + data.amount + ' recorded';
-        successDiv.textContent = msg;
+        successDiv.textContent = (currentAction === 'deposit' ? 'Deposit' : 'Withdrawal') +
+            ' order submitted for ' + data.account + '.';
         successDiv.style.display = '';
-        setTimeout(function () { successDiv.style.display = 'none'; }, 5000);
+        setTimeout(function () { successDiv.style.display = 'none'; }, 6000);
+    })
+    .catch(function () {
+        document.getElementById('modal-confirm').disabled = false;
+        errDiv.textContent = 'An error occurred. Please try again.';
+        errDiv.style.display = '';
     });
 }
 </script>

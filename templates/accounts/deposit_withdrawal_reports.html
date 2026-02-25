@@ -1,64 +1,86 @@
 {% extends 'base.html' %}
 
-{% block title %}D/W Reports{% endblock %}
+{% block title %}Deposits & Withdrawals{% endblock %}
 
 {% block content %}
-<div class="container py-4" style="max-width: 900px;">
+<div class="container-fluid py-4" style="max-width: 1200px;">
 
-    <h3 class="mb-4"><i class="bi bi-bar-chart"></i> Deposit / Withdrawal Reports</h3>
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0 fw-semibold"><i class="bi bi-cash-stack me-2"></i>Deposits & Withdrawals</h4>
+        <div class="d-flex gap-2">
+            <button class="btn btn-danger px-4" id="btn-new-deposit">
+                <i class="bi bi-arrow-down-circle me-1"></i> New Deposit
+            </button>
+            <button class="btn btn-success px-4" id="btn-new-withdrawal">
+                <i class="bi bi-arrow-up-circle me-1"></i> New Withdrawal
+            </button>
+        </div>
+    </div>
 
-    <!-- Summary cards (hidden until filter applied) -->
-    <div id="totals-row" class="row mb-4" style="display:none;">
+    <!-- Summary cards -->
+    <div class="row mb-4 g-3">
         <div class="col-md-4">
-            <div class="card border-danger">
-                <div class="card-body text-center">
-                    <h6 class="text-muted">Total Deposits</h6>
-                    <h3 class="text-danger" id="total-deposits">-</h3>
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center py-3">
+                    <div class="text-muted small mb-1">Total Deposits</div>
+                    <div class="fs-4 fw-bold text-danger" id="total-deposits">—</div>
                 </div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card border-success">
-                <div class="card-body text-center">
-                    <h6 class="text-muted">Total Withdrawals</h6>
-                    <h3 class="text-success" id="total-withdrawals">-</h3>
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center py-3">
+                    <div class="text-muted small mb-1">Total Withdrawals</div>
+                    <div class="fs-4 fw-bold text-success" id="total-withdrawals">—</div>
                 </div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card border-primary">
-                <div class="card-body text-center">
-                    <h6 class="text-muted">Net</h6>
-                    <h3 id="total-net">-</h3>
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center py-3">
+                    <div class="text-muted small mb-1">Net</div>
+                    <div class="fs-4 fw-bold" id="total-net">—</div>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Filters -->
-    <div class="card mb-4">
+    <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
-            <div class="row g-3 align-items-end">
+            <div class="row g-2 align-items-end">
                 <div class="col-md-4 position-relative">
-                    <label class="form-label">Search by Nickname or API</label>
-                    <input type="text" id="filter-q" class="form-control" placeholder="Nickname or API key..." autocomplete="off">
+                    <label class="form-label small text-muted mb-1">Account</label>
+                    <input type="text" id="filter-q" class="form-control" placeholder="Search by nickname or API key..." autocomplete="off">
                     <input type="hidden" id="filter-account-id">
-                    <div id="search-results" class="list-group position-absolute w-100 shadow" style="z-index:100; display:none; max-height:250px; overflow-y:auto;"></div>
+                    <div id="search-results" class="list-group position-absolute shadow" style="z-index:100; display:none; max-height:250px; overflow-y:auto; width:calc(100% - 24px);"></div>
                     <div id="selected-account" class="mt-2" style="display:none;">
-                        <span class="badge bg-primary fs-6" id="selected-badge"></span>
-                        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="btn-clear-account">Change</button>
+                        <span class="badge bg-primary" id="selected-badge"></span>
+                        <button type="button" class="btn btn-sm btn-link p-0 ms-2 text-secondary" id="btn-clear-account">Change</button>
                     </div>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label">From</label>
+                    <label class="form-label small text-muted mb-1">From</label>
                     <input type="date" id="filter-from" class="form-control">
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label">To</label>
+                    <label class="form-label small text-muted mb-1">To</label>
                     <input type="date" id="filter-to" class="form-control">
                 </div>
-                <div class="col-md-4 d-flex gap-2">
-                    <button id="btn-filter" class="btn btn-primary flex-fill">Filter</button>
+                <div class="col-md-1">
+                    <label class="form-label small text-muted mb-1">Status</label>
+                    <select id="filter-status" class="form-select">
+                        <option value="">All</option>
+                        <option value="pending">Pending</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex gap-2">
+                    <button id="btn-filter" class="btn btn-primary flex-fill">
+                        <i class="bi bi-funnel"></i> Filter
+                    </button>
                     <button id="btn-clear" class="btn btn-outline-secondary flex-fill">Clear</button>
                 </div>
             </div>
@@ -66,102 +88,253 @@
     </div>
 
     <!-- History table -->
-    <div class="card">
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center py-3">
+            <span class="fw-semibold">Transactions</span>
+            <small class="text-muted" id="entries-count"></small>
+        </div>
         <div class="card-body p-0">
-            <table class="table table-striped mb-0">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Date</th>
-                        <th>Account</th>
-                        <th>Platform</th>
-                        <th>Network</th>
-                        <th>Wallet</th>
-                        <th class="text-end">Deposit</th>
-                        <th class="text-end">Withdrawal</th>
-                        <th class="text-end">Balance</th>
-                    </tr>
-                </thead>
-                <tbody id="history-body">
-                    <tr><td colspan="8" class="text-center text-muted py-3">Use the filters above to view reports</td></tr>
-                </tbody>
-            </table>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th class="ps-3">Date</th>
+                            <th>Account</th>
+                            <th>Wallet Name</th>
+                            <th>Operation</th>
+                            <th class="text-end pe-4">Amount</th>
+                            <th class="ps-4">Status</th>
+                            <th class="pe-3"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-body">
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                <div class="spinner-border spinner-border-sm me-2" role="status"></div>Loading...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
+</div>
+
+<!-- View / Edit Modal -->
+<div class="modal fade" id="view-modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom-0 pb-1">
+                <h5 class="modal-title fw-semibold" id="view-modal-title">Entry Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-0">
+
+                <!-- Read-only info row -->
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <div class="p-2 bg-light rounded h-100">
+                            <div class="text-muted" style="font-size:.72rem;">Account</div>
+                            <div class="fw-semibold small" id="view-account"></div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 bg-light rounded h-100">
+                            <div class="text-muted" style="font-size:.72rem;">Platform</div>
+                            <div class="small" id="view-platform"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Network</label>
+                    <select id="view-network" class="form-select">
+                        <option value="">— None —</option>
+                        {% for n in networks %}
+                        <option value="{{ n.id }}">{{ n.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Amount</label>
+                    <input type="number" id="view-amount" class="form-control" step="0.01" min="0" placeholder="0.00">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Wallet Name</label>
+                    <input type="text" id="view-wallet-name" class="form-control">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Wallet Address</label>
+                    <input type="text" id="view-wallet-address" class="form-control">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Status</label>
+                    <select id="view-status" class="form-select">
+                        <option value="pending">Pending</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                </div>
+
+                <div id="view-error" class="alert alert-danger py-2 mb-0" style="display:none;"></div>
+            </div>
+            <div class="modal-footer border-top-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary px-4" id="view-save">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Action Modal -->
+<div class="modal fade" id="action-modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom-0 pb-2">
+                <h5 class="modal-title fw-semibold" id="modal-title">New Entry</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-0">
+
+                <!-- Account search -->
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Account</label>
+                    <div class="position-relative">
+                        <input type="text" id="modal-account-search" class="form-control" placeholder="Search by nickname or API..." autocomplete="off">
+                        <div id="modal-search-results" class="list-group position-absolute w-100 shadow" style="z-index:200; display:none; max-height:200px; overflow-y:auto;"></div>
+                    </div>
+                    <div id="modal-selected-account" class="mt-2" style="display:none;">
+                        <span class="badge bg-secondary fs-6" id="modal-selected-badge"></span>
+                        <button type="button" class="btn btn-sm btn-link p-0 ms-2 text-muted" id="modal-change-account">Change</button>
+                    </div>
+                </div>
+
+                <!-- Deposit-only: Network -->
+                <div id="deposit-fields">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Network</label>
+                        <select id="modal-network" class="form-select">
+                            <option value="">— Select network —</option>
+                            {% for n in networks %}
+                            <option value="{{ n.id }}">{{ n.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Amount (shared) -->
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Amount</label>
+                    <input type="number" id="modal-amount" class="form-control" step="0.01" min="0" placeholder="0.00">
+                </div>
+
+                <!-- Deposit-only: Wallet Name + Address -->
+                <div id="deposit-wallet-fields">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Wallet Name</label>
+                        <input type="text" id="modal-wallet-name" class="form-control" placeholder="e.g. MEXC, Binance, OKX...">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Wallet Address</label>
+                        <input type="text" id="modal-wallet-address" class="form-control" placeholder="0xN13Bvsd...">
+                    </div>
+                </div>
+
+                <div id="modal-error" class="alert alert-danger py-2 mb-0" style="display:none;"></div>
+            </div>
+            <div class="modal-footer border-top-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary px-4" id="modal-confirm">Confirm</button>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-// --- Search autocomplete ---
-var searchTimer = null;
-var searchInput = document.getElementById('filter-q');
-var resultsDiv = document.getElementById('search-results');
-var accountIdInput = document.getElementById('filter-account-id');
-var selectedDiv = document.getElementById('selected-account');
-var selectedBadge = document.getElementById('selected-badge');
-var selectedNick = '';
+function getCsrf() {
+    return document.cookie.split('; ')
+        .find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
+}
 
-searchInput.addEventListener('input', function () {
-    clearTimeout(searchTimer);
+var currentAction = null;
+var modalSelectedAccountId = null;
+var filterSelectedNick = '';
+var viewModal = new bootstrap.Modal(document.getElementById('view-modal'));
+var currentEditEntry = null;
+
+var actionModal = new bootstrap.Modal(document.getElementById('action-modal'));
+
+// ── Filter search autocomplete ──────────────────────────────────────────────
+var filterSearchTimer = null;
+var filterInput = document.getElementById('filter-q');
+var filterResults = document.getElementById('search-results');
+
+filterInput.addEventListener('input', function () {
+    clearTimeout(filterSearchTimer);
     var q = this.value.trim();
-    if (q.length < 1) { resultsDiv.style.display = 'none'; return; }
-
-    searchTimer = setTimeout(function () {
+    if (q.length < 1) { filterResults.style.display = 'none'; return; }
+    filterSearchTimer = setTimeout(function () {
         fetch('/account-search/?q=' + encodeURIComponent(q))
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                resultsDiv.innerHTML = '';
+            .then(r => r.json())
+            .then(data => {
+                filterResults.innerHTML = '';
                 if (!data.results.length) {
-                    resultsDiv.innerHTML = '<div class="list-group-item text-muted">No accounts found</div>';
-                    resultsDiv.style.display = '';
+                    filterResults.innerHTML = '<div class="list-group-item text-muted">No accounts found</div>';
+                    filterResults.style.display = '';
                     return;
                 }
                 data.results.forEach(function (acc) {
                     var item = document.createElement('a');
                     item.href = '#';
-                    item.className = 'list-group-item list-group-item-action';
-                    var label = acc.nick + ' (' + (acc.platform || 'N/A') + ')';
-                    if (acc.api) label += '  —  API: ' + acc.api;
-                    item.textContent = label;
+                    item.className = 'list-group-item list-group-item-action py-2';
+                    item.textContent = acc.nick + ' (' + (acc.platform || 'N/A') + ')' + (acc.api ? '  —  ' + acc.api : '');
                     item.addEventListener('click', function (e) {
                         e.preventDefault();
-                        accountIdInput.value = acc.id;
-                        selectedNick = acc.nick;
-                        selectedBadge.textContent = acc.nick + ' (' + (acc.platform || 'N/A') + ')';
-                        selectedDiv.style.display = '';
-                        searchInput.style.display = 'none';
-                        resultsDiv.style.display = 'none';
+                        document.getElementById('filter-account-id').value = acc.id;
+                        filterSelectedNick = acc.nick;
+                        document.getElementById('selected-badge').textContent = acc.nick + ' (' + (acc.platform || 'N/A') + ')';
+                        document.getElementById('selected-account').style.display = '';
+                        filterInput.style.display = 'none';
+                        filterResults.style.display = 'none';
                     });
-                    resultsDiv.appendChild(item);
+                    filterResults.appendChild(item);
                 });
-                resultsDiv.style.display = '';
+                filterResults.style.display = '';
             });
     }, 250);
 });
 
 document.addEventListener('click', function (e) {
-    if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) {
-        resultsDiv.style.display = 'none';
-    }
+    if (!filterInput.contains(e.target) && !filterResults.contains(e.target))
+        filterResults.style.display = 'none';
 });
 
 document.getElementById('btn-clear-account').addEventListener('click', function () {
-    accountIdInput.value = '';
-    selectedNick = '';
-    searchInput.value = '';
-    searchInput.style.display = '';
-    selectedDiv.style.display = 'none';
-    searchInput.focus();
+    document.getElementById('filter-account-id').value = '';
+    filterSelectedNick = '';
+    filterInput.value = '';
+    filterInput.style.display = '';
+    document.getElementById('selected-account').style.display = 'none';
+    filterInput.focus();
 });
 
-// --- Load history ---
+// ── Load history ────────────────────────────────────────────────────────────
 function loadHistory(params) {
+    window._lastHistoryParams = params || {};
     var qs = new URLSearchParams(params || {}).toString();
+    document.getElementById('history-body').innerHTML =
+        '<tr><td colspan="7" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2" role="status"></div>Loading...</td></tr>';
+
     fetch('/deposit-withdrawal/history/' + (qs ? '?' + qs : ''))
-        .then(function (r) { return r.json(); })
+        .then(r => r.json())
         .then(function (data) {
-            var totalsRow = document.getElementById('totals-row');
             var dep = parseFloat(data.totals.deposits) || 0;
             var wd = parseFloat(data.totals.withdrawals) || 0;
             var net = wd - dep;
@@ -170,61 +343,276 @@ function loadHistory(params) {
             document.getElementById('total-withdrawals').textContent = wd.toFixed(2);
             var netEl = document.getElementById('total-net');
             netEl.textContent = (net >= 0 ? '+' : '') + net.toFixed(2);
-            netEl.className = net >= 0 ? 'text-success' : 'text-danger';
-            totalsRow.style.display = '';
+            netEl.className = 'fs-4 fw-bold ' + (net >= 0 ? 'text-success' : 'text-danger');
 
             var tbody = document.getElementById('history-body');
-            if (!data.entries.length) {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No entries found</td></tr>';
+            var count = data.entries.length;
+            document.getElementById('entries-count').textContent = count + ' record' + (count !== 1 ? 's' : '');
+
+            if (!count) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No entries found</td></tr>';
                 return;
             }
             tbody.innerHTML = '';
             data.entries.forEach(function (e) {
                 var tr = document.createElement('tr');
-                var amountCol = e.type === 'deposit'
-                    ? '<td class="text-end"><span class="text-danger fw-bold">-' + e.amount + '</span></td><td class="text-end">-</td>'
-                    : '<td class="text-end">-</td><td class="text-end"><span class="text-success fw-bold">+' + e.amount + '</span></td>';
-                var balanceCol = e.current_balance
-                    ? '<td class="text-end">' + e.current_balance + ' CNY</td>'
-                    : '<td class="text-end">-</td>';
+                var isDeposit = e.type === 'deposit';
+
+                var opBadge = isDeposit
+                    ? '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Deposit</span>'
+                    : '<span class="badge bg-success-subtle text-success border border-success-subtle">Withdrawal</span>';
+
+                var amountHtml = isDeposit
+                    ? '<span class="text-danger fw-semibold">-' + e.amount + '</span>'
+                    : '<span class="text-success fw-semibold">+' + e.amount + '</span>';
+
+                var statusMap = {
+                    pending:   '<span class="badge bg-warning-subtle text-warning border border-warning-subtle">Pending</span>',
+                    completed: '<span class="badge bg-success-subtle text-success border border-success-subtle">Completed</span>',
+                    cancelled: '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Cancelled</span>',
+                };
+                var statusBadge = statusMap[e.status] || e.status;
+
                 tr.innerHTML =
-                    '<td>' + e.created_at + '</td>' +
-                    '<td>' + e.account + '</td>' +
-                    '<td>' + (e.platform || '-') + '</td>' +
-                    '<td>' + (e.network || '-') + '</td>' +
-                    '<td class="text-truncate" style="max-width:120px;" title="' + (e.wallet || '') + '">' + (e.wallet || '-') + '</td>' +
-                    amountCol +
-                    balanceCol;
+                    '<td class="ps-3 text-nowrap text-muted small">' + e.created_at + '</td>' +
+                    '<td class="fw-semibold">' + e.account + '</td>' +
+                    '<td class="text-muted small">' + (e.wallet_name || '—') + '</td>' +
+                    '<td>' + opBadge + '</td>' +
+                    '<td class="text-end pe-4">' + amountHtml + '</td>' +
+                    '<td class="ps-4">' + statusBadge + '</td>' +
+                    '<td class="pe-3 text-end"><button class="btn btn-sm btn-outline-primary btn-view" data-entry=\'' + JSON.stringify(e) + '\'>View</button></td>';
                 tbody.appendChild(tr);
+            });
+
+            document.querySelectorAll('.btn-view').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    openViewModal(JSON.parse(this.dataset.entry));
+                });
             });
         });
 }
 
-// --- Filter / Clear ---
+// ── Filter / Clear buttons ──────────────────────────────────────────────────
 document.getElementById('btn-filter').addEventListener('click', function () {
     var params = {};
-    if (selectedNick) params.q = selectedNick;
-    else {
-        var q = searchInput.value.trim();
-        if (q) params.q = q;
-    }
+    if (filterSelectedNick) params.q = filterSelectedNick;
+    else { var q = filterInput.value.trim(); if (q) params.q = q; }
     var from = document.getElementById('filter-from').value;
     var to = document.getElementById('filter-to').value;
+    var status = document.getElementById('filter-status').value;
     if (from) params.date_from = from;
     if (to) params.date_to = to;
+    if (status) params.status = status;
     loadHistory(params);
 });
 
 document.getElementById('btn-clear').addEventListener('click', function () {
-    accountIdInput.value = '';
-    selectedNick = '';
-    searchInput.value = '';
-    searchInput.style.display = '';
-    selectedDiv.style.display = 'none';
+    document.getElementById('filter-account-id').value = '';
+    filterSelectedNick = '';
+    filterInput.value = '';
+    filterInput.style.display = '';
+    document.getElementById('selected-account').style.display = 'none';
     document.getElementById('filter-from').value = '';
     document.getElementById('filter-to').value = '';
-    document.getElementById('totals-row').style.display = 'none';
-    document.getElementById('history-body').innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Use the filters above to view reports</td></tr>';
+    document.getElementById('filter-status').value = '';
+    loadHistory();
 });
+
+// ── Modal: account search ───────────────────────────────────────────────────
+var modalSearchTimer = null;
+var modalSearchInput = document.getElementById('modal-account-search');
+var modalResults = document.getElementById('modal-search-results');
+
+modalSearchInput.addEventListener('input', function () {
+    clearTimeout(modalSearchTimer);
+    var q = this.value.trim();
+    if (q.length < 1) { modalResults.style.display = 'none'; return; }
+    modalSearchTimer = setTimeout(function () {
+        fetch('/account-search/?q=' + encodeURIComponent(q))
+            .then(r => r.json())
+            .then(function (data) {
+                modalResults.innerHTML = '';
+                if (!data.results.length) {
+                    modalResults.innerHTML = '<div class="list-group-item text-muted">No accounts found</div>';
+                    modalResults.style.display = '';
+                    return;
+                }
+                data.results.forEach(function (acc) {
+                    var item = document.createElement('a');
+                    item.href = '#';
+                    item.className = 'list-group-item list-group-item-action py-2';
+                    item.textContent = acc.nick + ' (' + (acc.platform || 'N/A') + ')';
+                    item.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        modalSelectedAccountId = acc.id;
+                        document.getElementById('modal-selected-badge').textContent = acc.nick + ' (' + (acc.platform || 'N/A') + ')';
+                        document.getElementById('modal-selected-account').style.display = '';
+                        modalSearchInput.style.display = 'none';
+                        modalResults.style.display = 'none';
+                    });
+                    modalResults.appendChild(item);
+                });
+                modalResults.style.display = '';
+            });
+    }, 250);
+});
+
+document.getElementById('modal-change-account').addEventListener('click', function () {
+    modalSelectedAccountId = null;
+    modalSearchInput.value = '';
+    modalSearchInput.style.display = '';
+    document.getElementById('modal-selected-account').style.display = 'none';
+    modalSearchInput.focus();
+});
+
+// ── New Deposit / Withdrawal buttons ────────────────────────────────────────
+document.getElementById('btn-new-deposit').addEventListener('click', function () {
+    openModal('deposit');
+});
+document.getElementById('btn-new-withdrawal').addEventListener('click', function () {
+    openModal('withdrawal');
+});
+
+function openModal(action) {
+    currentAction = action;
+    var isDeposit = action === 'deposit';
+
+    document.getElementById('modal-title').textContent = isDeposit ? 'New Deposit' : 'New Withdrawal';
+    document.getElementById('modal-confirm').className = 'btn px-4 ' + (isDeposit ? 'btn-danger' : 'btn-success');
+    document.getElementById('modal-confirm').textContent = isDeposit ? 'Record Deposit' : 'Record Withdrawal';
+
+    document.getElementById('deposit-fields').style.display = isDeposit ? '' : 'none';
+    document.getElementById('deposit-wallet-fields').style.display = isDeposit ? '' : 'none';
+
+    // Reset fields
+    modalSelectedAccountId = null;
+    modalSearchInput.value = '';
+    modalSearchInput.style.display = '';
+    document.getElementById('modal-selected-account').style.display = 'none';
+    document.getElementById('modal-network').value = '';
+    document.getElementById('modal-amount').value = '';
+    document.getElementById('modal-wallet-name').value = '';
+    document.getElementById('modal-wallet-address').value = '';
+    document.getElementById('modal-error').style.display = 'none';
+
+    actionModal.show();
+    setTimeout(function () { modalSearchInput.focus(); }, 350);
+}
+
+// ── Confirm ──────────────────────────────────────────────────────────────────
+document.getElementById('modal-confirm').addEventListener('click', submitEntry);
+
+function submitEntry() {
+    var errDiv = document.getElementById('modal-error');
+    errDiv.style.display = 'none';
+
+    if (!modalSelectedAccountId) {
+        errDiv.textContent = 'Please select an account';
+        errDiv.style.display = '';
+        return;
+    }
+    var amount = document.getElementById('modal-amount').value;
+    if (!amount || parseFloat(amount) <= 0) {
+        errDiv.textContent = 'Enter a valid amount';
+        errDiv.style.display = '';
+        return;
+    }
+
+    var url = currentAction === 'deposit' ? '/deposit/create/' : '/withdrawal/create/';
+    var body = { account_id: modalSelectedAccountId, amount: parseFloat(amount) };
+
+    if (currentAction === 'deposit') {
+        var networkId = document.getElementById('modal-network').value;
+        body.network_id = networkId ? parseInt(networkId) : null;
+        body.wallet_name = document.getElementById('modal-wallet-name').value.trim();
+        body.wallet = document.getElementById('modal-wallet-address').value.trim();
+    }
+
+    document.getElementById('modal-confirm').disabled = true;
+
+    fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+        body: JSON.stringify(body)
+    })
+    .then(r => r.json())
+    .then(function (data) {
+        document.getElementById('modal-confirm').disabled = false;
+        if (data.error) { errDiv.textContent = data.error; errDiv.style.display = ''; return; }
+        actionModal.hide();
+        loadHistory();
+    })
+    .catch(function () {
+        document.getElementById('modal-confirm').disabled = false;
+        errDiv.textContent = 'An error occurred. Please try again.';
+        errDiv.style.display = '';
+    });
+}
+
+// ── View / Edit modal ─────────────────────────────────────────────────────────
+function openViewModal(entry) {
+    currentEditEntry = entry;
+    var isDeposit = entry.type === 'deposit';
+
+    document.getElementById('view-modal-title').textContent =
+        (isDeposit ? 'Deposit' : 'Withdrawal') + ' — ' + entry.account;
+    document.getElementById('view-account').textContent = entry.account;
+    document.getElementById('view-platform').textContent = entry.platform || '—';
+
+    document.getElementById('view-network').value = entry.network_id || '';
+    document.getElementById('view-amount').value = entry.amount;
+    document.getElementById('view-wallet-name').value = entry.wallet_name || '';
+    document.getElementById('view-wallet-address').value = entry.wallet || '';
+    document.getElementById('view-status').value = entry.status || 'pending';
+    document.getElementById('view-error').style.display = 'none';
+
+    viewModal.show();
+}
+
+document.getElementById('view-save').addEventListener('click', function () {
+    var errDiv = document.getElementById('view-error');
+    errDiv.style.display = 'none';
+
+    var amount = document.getElementById('view-amount').value;
+    if (!amount || parseFloat(amount) <= 0) {
+        errDiv.textContent = 'Enter a valid amount';
+        errDiv.style.display = '';
+        return;
+    }
+
+    var networkId = document.getElementById('view-network').value;
+    var body = {
+        type: currentEditEntry.type,
+        id: currentEditEntry.id,
+        amount: parseFloat(amount),
+        network_id: networkId ? parseInt(networkId) : null,
+        wallet_name: document.getElementById('view-wallet-name').value.trim(),
+        wallet: document.getElementById('view-wallet-address').value.trim(),
+        status: document.getElementById('view-status').value,
+    };
+
+    this.disabled = true;
+
+    fetch('/dw-entry/update/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+        body: JSON.stringify(body),
+    })
+    .then(r => r.json())
+    .then(function (data) {
+        document.getElementById('view-save').disabled = false;
+        if (data.error) { errDiv.textContent = data.error; errDiv.style.display = ''; return; }
+        viewModal.hide();
+        loadHistory(window._lastHistoryParams || {});
+    })
+    .catch(function () {
+        document.getElementById('view-save').disabled = false;
+        errDiv.textContent = 'An error occurred. Please try again.';
+        errDiv.style.display = '';
+    });
+});
+
+// ── Load on page ready ───────────────────────────────────────────────────────
+loadHistory();
 </script>
 {% endblock %}
