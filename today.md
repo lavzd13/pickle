@@ -3,12 +3,12 @@ Regarding sound, SOUND MUST BE ENABLED IN THE BROWSER BECAUSE THAT IS FUCKING HI
 !!! SOUND WORKS NOW !!!
 
 TODO:
-- Creation date of the pokerclans account field (date when it was registered in app)
-- Withdrawal balance make it more clear
 
 
 
 DONE:
+- Creation date of the pokerclans account field (date when it was registered in app)
+- Withdrawal balance make it more clear
 - Put default value for withdrawal balance to be 1400. Also change the name of it, make smth better
 - Make modals for D/W with all necessary info.
 - Add network option for payment table

@@ -146,6 +146,7 @@
                                     <span class="text-muted">Device:</span> {{ account.device_name|default:"-" }}
                                     {% if account.device_name %}<button class="btn btn-link p-0 ms-1 copy-btn" onclick="copyText(event, '{{ account.device_name|escapejs }}')" title="Copy"><i class="bi bi-clipboard"></i></button>{% endif %}
                                 </div>
+                                <div><span class="text-muted">Creation Date:</span> {{ account.creation_date|default:"-" }}</div>
                             </div>
 
                             <!-- Play Info -->

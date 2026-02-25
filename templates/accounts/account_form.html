@@ -18,7 +18,7 @@
                 <form method="post" enctype="multipart/form-data">
                     {% csrf_token %}
                     <div class="row">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label for="{{ account_form.nick.id_for_label }}" class="form-label">Nickname *</label>
                             {{ account_form.nick }}
                             {% if account_form.nick.errors %}
@@ -26,11 +26,19 @@
                             {% endif %}
                         </div>
 
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label for="{{ account_form.device_name.id_for_label }}" class="form-label">Device Name</label>
                             {{ account_form.device_name }}
                             {% if account_form.device_name.errors %}
                             <div class="text-danger">{{ account_form.device_name.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ account_form.creation_date.id_for_label }}" class="form-label">Creation Date</label>
+                            {{ account_form.creation_date }}
+                            {% if account_form.creation_date.errors %}
+                            <div class="text-danger">{{ account_form.creation_date.errors }}</div>
                             {% endif %}
                         </div>
                     </div>
