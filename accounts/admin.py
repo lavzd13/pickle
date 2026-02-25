@@ -3,7 +3,7 @@ from .models import (
     AccountDetail, Payment, PlaySession, Platform,
     ProxyVpn, WalletProvider, Network,
     Location, Security, PlayInfo, LastTransaction,
-    DepositWithdrawal,
+    Deposit, Withdrawal,
 )
 
 
@@ -111,9 +111,17 @@ class PlaySessionAdmin(admin.ModelAdmin):
         return obj.created_by == request.user
 
 
-@admin.register(DepositWithdrawal)
-class DepositWithdrawalAdmin(admin.ModelAdmin):
-    list_display = ['account', 'deposit', 'withdrawal', 'created_by', 'created_at']
-    list_filter = ['account', 'created_by', 'created_at']
+@admin.register(Deposit)
+class DepositAdmin(admin.ModelAdmin):
+    list_display = ['account', 'amount', 'network', 'wallet', 'current_balance', 'created_by', 'created_at']
+    list_filter = ['network', 'created_by', 'created_at']
+    search_fields = ['account__nick']
+    readonly_fields = ['created_at']
+
+
+@admin.register(Withdrawal)
+class WithdrawalAdmin(admin.ModelAdmin):
+    list_display = ['account', 'amount', 'network', 'wallet', 'current_balance', 'created_by', 'created_at']
+    list_filter = ['network', 'created_by', 'created_at']
     search_fields = ['account__nick']
     readonly_fields = ['created_at']

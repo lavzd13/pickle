@@ -45,17 +45,47 @@
 
 </div>
 
-<!-- Amount modal -->
+<!-- Deposit/Withdrawal modal -->
 <div class="modal fade" id="amount-modal" tabindex="-1">
-    <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modal-title">Enter Amount</h5>
+                <h5 class="modal-title" id="modal-title">Enter Details</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <input type="number" id="modal-amount" class="form-control form-control-lg text-center" step="0.01" min="0" placeholder="0.00">
-                <div id="modal-error" class="text-danger mt-2" style="display:none;"></div>
+                <!-- Deposit-only fields -->
+                <div id="deposit-fields">
+                    <div class="mb-3">
+                        <label class="form-label">Network</label>
+                        <select id="modal-network" class="form-select">
+                            <option value="">— Select network —</option>
+                            {% for n in networks %}
+                            <option value="{{ n.id }}">{{ n.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <!-- Shared fields -->
+                <div class="mb-3">
+                    <label class="form-label">Amount</label>
+                    <input type="number" id="modal-amount" class="form-control" step="0.01" min="0" placeholder="0.00">
+                </div>
+                <!-- Deposit-only fields (continued) -->
+                <div id="deposit-address-field" class="mb-3">
+                    <label class="form-label">Wallet address/name from which we deposited</label>
+                    <input type="text" id="modal-wallet" class="form-control" placeholder="0xN13Bvsd.../MEXC user">
+                </div>
+                <div id="deposit-balance-field" class="mb-3">
+                    <label class="form-label">Current Balance</label>
+                    <input type="number" id="modal-deposit-balance" class="form-control" step="0.01" min="0" placeholder="0.00">
+                </div>
+                <!-- Withdrawal-only fields -->
+                <div id="withdrawal-fields" class="mb-3">
+                    <label class="form-label">Acc. balance after withdraw</label>
+                    <input type="number" id="modal-balance" class="form-control" step="0.01" min="0" placeholder="0.00">
+                </div>
+                <div id="modal-error" class="text-danger" style="display:none;"></div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -121,7 +151,10 @@ document.addEventListener('click', function (e) {
 });
 
 // --- Select / Change account ---
+var selectedAccount = null;
+
 function selectAccount(acc) {
+    selectedAccount = acc;
     selectedAccountId = acc.id;
     document.getElementById('card-nick').textContent = acc.nick;
     document.getElementById('card-platform').textContent = acc.platform || '';
@@ -134,6 +167,7 @@ function selectAccount(acc) {
 }
 
 document.getElementById('btn-change').addEventListener('click', function () {
+    selectedAccount = null;
     selectedAccountId = null;
     document.getElementById('account-card').style.display = 'none';
     document.getElementById('search-card').style.display = '';
@@ -143,20 +177,30 @@ document.getElementById('btn-change').addEventListener('click', function () {
 // --- Deposit / Withdraw buttons open modal ---
 document.getElementById('btn-deposit').addEventListener('click', function () {
     currentAction = 'deposit';
-    document.getElementById('modal-title').textContent = 'Deposit Amount';
+    document.getElementById('modal-title').textContent = 'Deposit';
     document.getElementById('modal-confirm').className = 'btn btn-danger';
     openModal();
 });
 
 document.getElementById('btn-withdraw').addEventListener('click', function () {
     currentAction = 'withdrawal';
-    document.getElementById('modal-title').textContent = 'Withdrawal Amount';
+    document.getElementById('modal-title').textContent = 'Withdrawal';
     document.getElementById('modal-confirm').className = 'btn btn-success';
     openModal();
 });
 
 function openModal() {
+    var isDeposit = currentAction === 'deposit';
+    document.getElementById('deposit-fields').style.display = isDeposit ? '' : 'none';
+    document.getElementById('deposit-address-field').style.display = isDeposit ? '' : 'none';
+    document.getElementById('deposit-balance-field').style.display = isDeposit ? '' : 'none';
+    document.getElementById('withdrawal-fields').style.display = isDeposit ? 'none' : '';
+
+    document.getElementById('modal-network').value = '';
+    document.getElementById('modal-wallet').value = '';
     document.getElementById('modal-amount').value = '';
+    document.getElementById('modal-deposit-balance').value = '';
+    document.getElementById('modal-balance').value = '';
     document.getElementById('modal-error').style.display = 'none';
     amountModal.show();
     setTimeout(function () { document.getElementById('modal-amount').focus(); }, 300);
@@ -179,11 +223,22 @@ function submitEntry() {
         return;
     }
 
-    var body = { account_id: selectedAccountId };
-    if (currentAction === 'deposit') body.deposit = parseFloat(amount);
-    else body.withdrawal = parseFloat(amount);
+    var url = currentAction === 'deposit' ? '/deposit/create/' : '/withdrawal/create/';
+    var body = { account_id: selectedAccountId, amount: parseFloat(amount) };
 
-    fetch('/deposit-withdrawal/create/', {
+    if (currentAction === 'deposit') {
+        var networkId = document.getElementById('modal-network').value;
+        var wallet = document.getElementById('modal-wallet').value.trim();
+        var depBalance = document.getElementById('modal-deposit-balance').value;
+        body.network_id = networkId ? parseInt(networkId) : null;
+        body.wallet = wallet;
+        body.current_balance = depBalance ? parseFloat(depBalance) : null;
+    } else {
+        var balance = document.getElementById('modal-balance').value;
+        body.current_balance = balance ? parseFloat(balance) : null;
+    }
+
+    fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
         body: JSON.stringify(body)
@@ -194,8 +249,8 @@ function submitEntry() {
         amountModal.hide();
         var successDiv = document.getElementById('form-success');
         var msg = currentAction === 'deposit'
-            ? 'Deposit of ' + data.deposit + ' recorded'
-            : 'Withdrawal of ' + data.withdrawal + ' recorded';
+            ? 'Deposit of ' + data.amount + ' recorded'
+            : 'Withdrawal of ' + data.amount + ' recorded';
         successDiv.textContent = msg;
         successDiv.style.display = '';
         setTimeout(function () { successDiv.style.display = 'none'; }, 5000);

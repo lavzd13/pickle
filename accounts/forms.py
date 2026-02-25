@@ -156,12 +156,13 @@ class WalletProviderForm(forms.ModelForm):
 class PaymentForm(forms.ModelForm):
     class Meta:
         model = Payment
-        fields = ['withdraw_pass', 'min_balance', 'crypto_wallet', 'wallet_provider']
+        fields = ['withdraw_pass', 'min_balance', 'crypto_wallet', 'wallet_provider', 'network']
         widgets = {
             'withdraw_pass': forms.NumberInput(attrs={'class': 'form-control'}),
             'crypto_wallet': forms.TextInput(attrs={'class': 'form-control'}),
             'min_balance': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'wallet_provider': forms.Select(attrs={'class': 'form-control'}),
+            'network': forms.Select(attrs={'class': 'form-control'}),
         }
 
 

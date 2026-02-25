@@ -25,9 +25,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 return response.json();
             })
             .then(function (data) {
-                var select = document.getElementById('id_network');
-                var option = new Option(data.name, data.id, true, true);
-                select.add(option);
+                document.querySelectorAll('select[id$="-network"]').forEach(function (select) {
+                    select.add(new Option(data.name, data.id, true, true));
+                });
 
                 nameInput.value = '';
                 errorDiv.style.display = 'none';

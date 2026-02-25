@@ -74,12 +74,15 @@
                         <th>Date</th>
                         <th>Account</th>
                         <th>Platform</th>
+                        <th>Network</th>
+                        <th>Wallet</th>
                         <th class="text-end">Deposit</th>
                         <th class="text-end">Withdrawal</th>
+                        <th class="text-end">Balance</th>
                     </tr>
                 </thead>
                 <tbody id="history-body">
-                    <tr><td colspan="5" class="text-center text-muted py-3">Use the filters above to view reports</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted py-3">Use the filters above to view reports</td></tr>
                 </tbody>
             </table>
         </div>
@@ -172,18 +175,26 @@ function loadHistory(params) {
 
             var tbody = document.getElementById('history-body');
             if (!data.entries.length) {
-                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No entries found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No entries found</td></tr>';
                 return;
             }
             tbody.innerHTML = '';
             data.entries.forEach(function (e) {
                 var tr = document.createElement('tr');
+                var amountCol = e.type === 'deposit'
+                    ? '<td class="text-end"><span class="text-danger fw-bold">-' + e.amount + '</span></td><td class="text-end">-</td>'
+                    : '<td class="text-end">-</td><td class="text-end"><span class="text-success fw-bold">+' + e.amount + '</span></td>';
+                var balanceCol = e.current_balance
+                    ? '<td class="text-end">' + e.current_balance + ' CNY</td>'
+                    : '<td class="text-end">-</td>';
                 tr.innerHTML =
                     '<td>' + e.created_at + '</td>' +
                     '<td>' + e.account + '</td>' +
                     '<td>' + (e.platform || '-') + '</td>' +
-                    '<td class="text-end">' + (e.deposit ? '<span class="text-danger fw-bold">-' + e.deposit + '</span>' : '-') + '</td>' +
-                    '<td class="text-end">' + (e.withdrawal ? '<span class="text-success fw-bold">+' + e.withdrawal + '</span>' : '-') + '</td>';
+                    '<td>' + (e.network || '-') + '</td>' +
+                    '<td class="text-truncate" style="max-width:120px;" title="' + (e.wallet || '') + '">' + (e.wallet || '-') + '</td>' +
+                    amountCol +
+                    balanceCol;
                 tbody.appendChild(tr);
             });
         });
@@ -213,7 +224,7 @@ document.getElementById('btn-clear').addEventListener('click', function () {
     document.getElementById('filter-from').value = '';
     document.getElementById('filter-to').value = '';
     document.getElementById('totals-row').style.display = 'none';
-    document.getElementById('history-body').innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Use the filters above to view reports</td></tr>';
+    document.getElementById('history-body').innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Use the filters above to view reports</td></tr>';
 });
 </script>
 {% endblock %}
