@@ -1,5 +1,4 @@
 {% extends 'base.html' %}
-
 {% block title %}Order{% endblock %}
 
 {% block content %}
@@ -40,72 +39,19 @@
                         <i class="bi bi-arrow-up-circle me-1"></i> Withdrawal
                     </button>
                 </div>
-                <div id="form-success" class="alert alert-success mt-3 mb-0 py-2" style="display:none;"></div>
             </div>
         </div>
     </div>
 
-</div>
-
-<!-- Order modal -->
-<div class="modal fade" id="order-modal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header border-bottom-0 pb-2">
-                <h5 class="modal-title fw-semibold" id="modal-title">Order</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body pt-0">
-
-                <!-- Deposit-only fields -->
-                <div id="deposit-fields">
-                    <div class="mb-3">
-                        <label class="form-label text-muted small">Network</label>
-                        <select id="modal-network" class="form-select">
-                            <option value="">— Select network —</option>
-                            {% for n in networks %}
-                            <option value="{{ n.id }}">{{ n.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label text-muted small">Wallet Address</label>
-                        <input type="text" id="modal-wallet-address" class="form-control"
-                               placeholder="0xN13Bvsd...">
-                    </div>
-                </div>
-
-                <!-- Shared: Current Balance -->
-                <div class="mb-3">
-                    <label class="form-label text-muted small" id="balance-label">Current Balance</label>
-                    <input type="number" id="modal-balance" class="form-control"
-                           step="0.01" min="0" placeholder="0.00">
-                </div>
-
-                <div id="modal-error" class="alert alert-danger py-2 mb-0" style="display:none;"></div>
-            </div>
-            <div class="modal-footer border-top-0 pt-0">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary px-4" id="modal-confirm">Submit</button>
-            </div>
-        </div>
-    </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-function getCsrf() {
-    return document.cookie.split('; ')
-        .find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
-}
-
 var selectedAccountId = null;
-var currentAction = null;
 var searchTimer = null;
 var searchInput = document.getElementById('account-search');
 var resultsDiv = document.getElementById('search-results');
-var orderModal = new bootstrap.Modal(document.getElementById('order-modal'));
 
 // ── Account search (eligible accounts only) ─────────────────────────────────
 searchInput.addEventListener('input', function () {
@@ -151,7 +97,6 @@ function selectAccount(acc) {
     document.getElementById('card-platform').textContent = acc.platform || '';
     document.getElementById('account-card').style.display = '';
     document.getElementById('search-card').style.display = 'none';
-    document.getElementById('form-success').style.display = 'none';
     searchInput.value = '';
     resultsDiv.style.display = 'none';
 }
@@ -163,81 +108,12 @@ document.getElementById('btn-change').addEventListener('click', function () {
     searchInput.focus();
 });
 
-// ── Open modal ──────────────────────────────────────────────────────────────
+// ── Navigate to order pages ──────────────────────────────────────────────────
 document.getElementById('btn-deposit').addEventListener('click', function () {
-    openModal('deposit');
+    window.location.href = '/deposit-withdrawal/order/deposit/' + selectedAccountId + '/';
 });
 document.getElementById('btn-withdraw').addEventListener('click', function () {
-    openModal('withdrawal');
+    window.location.href = '/deposit-withdrawal/order/withdrawal/' + selectedAccountId + '/';
 });
-
-function openModal(action) {
-    currentAction = action;
-    var isDeposit = action === 'deposit';
-
-    document.getElementById('modal-title').textContent = isDeposit ? 'Deposit Order' : 'Withdrawal Order';
-    document.getElementById('modal-confirm').className = 'btn px-4 ' + (isDeposit ? 'btn-danger' : 'btn-success');
-    document.getElementById('deposit-fields').style.display = isDeposit ? '' : 'none';
-    document.getElementById('balance-label').textContent = isDeposit ? 'Current Balance' : 'Current Balance';
-
-    document.getElementById('modal-network').value = '';
-    document.getElementById('modal-wallet-address').value = '';
-    document.getElementById('modal-balance').value = '';
-    document.getElementById('modal-error').style.display = 'none';
-
-    orderModal.show();
-    setTimeout(function () { document.getElementById('modal-balance').focus(); }, 350);
-}
-
-// ── Submit ──────────────────────────────────────────────────────────────────
-document.getElementById('modal-confirm').addEventListener('click', submitOrder);
-
-function submitOrder() {
-    var errDiv = document.getElementById('modal-error');
-    errDiv.style.display = 'none';
-
-    var balance = document.getElementById('modal-balance').value;
-    if (!balance || parseFloat(balance) < 0) {
-        errDiv.textContent = 'Enter a valid balance';
-        errDiv.style.display = '';
-        return;
-    }
-
-    var url = currentAction === 'deposit' ? '/deposit-order/create/' : '/withdrawal-order/create/';
-    var body = {
-        account_id: selectedAccountId,
-        current_balance: parseFloat(balance),
-    };
-
-    if (currentAction === 'deposit') {
-        var networkId = document.getElementById('modal-network').value;
-        body.network_id = networkId ? parseInt(networkId) : null;
-        body.wallet_address = document.getElementById('modal-wallet-address').value.trim();
-    }
-
-    document.getElementById('modal-confirm').disabled = true;
-
-    fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
-        body: JSON.stringify(body),
-    })
-    .then(r => r.json())
-    .then(function (data) {
-        document.getElementById('modal-confirm').disabled = false;
-        if (data.error) { errDiv.textContent = data.error; errDiv.style.display = ''; return; }
-        orderModal.hide();
-        var successDiv = document.getElementById('form-success');
-        successDiv.textContent = (currentAction === 'deposit' ? 'Deposit' : 'Withdrawal') +
-            ' order submitted for ' + data.account + '.';
-        successDiv.style.display = '';
-        setTimeout(function () { successDiv.style.display = 'none'; }, 6000);
-    })
-    .catch(function () {
-        document.getElementById('modal-confirm').disabled = false;
-        errDiv.textContent = 'An error occurred. Please try again.';
-        errDiv.style.display = '';
-    });
-}
 </script>
 {% endblock %}

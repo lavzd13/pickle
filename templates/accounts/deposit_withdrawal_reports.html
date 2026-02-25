@@ -9,12 +9,12 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h4 class="mb-0 fw-semibold"><i class="bi bi-cash-stack me-2"></i>Deposits & Withdrawals</h4>
         <div class="d-flex gap-2">
-            <button class="btn btn-danger px-4" id="btn-new-deposit">
+            <a href="{% url 'deposit_new_page' %}" class="btn btn-danger px-4">
                 <i class="bi bi-arrow-down-circle me-1"></i> New Deposit
-            </button>
-            <button class="btn btn-success px-4" id="btn-new-withdrawal">
+            </a>
+            <a href="{% url 'withdrawal_new_page' %}" class="btn btn-success px-4">
                 <i class="bi bi-arrow-up-circle me-1"></i> New Withdrawal
-            </button>
+            </a>
         </div>
     </div>
 
@@ -121,139 +121,6 @@
 
 </div>
 
-<!-- View / Edit Modal -->
-<div class="modal fade" id="view-modal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header border-bottom-0 pb-1">
-                <h5 class="modal-title fw-semibold" id="view-modal-title">Entry Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body pt-0">
-
-                <!-- Read-only info row -->
-                <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <div class="p-2 bg-light rounded h-100">
-                            <div class="text-muted" style="font-size:.72rem;">Account</div>
-                            <div class="fw-semibold small" id="view-account"></div>
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <div class="p-2 bg-light rounded h-100">
-                            <div class="text-muted" style="font-size:.72rem;">Platform</div>
-                            <div class="small" id="view-platform"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label text-muted small">Network</label>
-                    <select id="view-network" class="form-select">
-                        <option value="">— None —</option>
-                        {% for n in networks %}
-                        <option value="{{ n.id }}">{{ n.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label text-muted small">Amount</label>
-                    <input type="number" id="view-amount" class="form-control" step="0.01" min="0" placeholder="0.00">
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label text-muted small">Wallet Name</label>
-                    <input type="text" id="view-wallet-name" class="form-control">
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label text-muted small">Wallet Address</label>
-                    <input type="text" id="view-wallet-address" class="form-control">
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label text-muted small">Status</label>
-                    <select id="view-status" class="form-select">
-                        <option value="pending">Pending</option>
-                        <option value="completed">Completed</option>
-                        <option value="cancelled">Cancelled</option>
-                    </select>
-                </div>
-
-                <div id="view-error" class="alert alert-danger py-2 mb-0" style="display:none;"></div>
-            </div>
-            <div class="modal-footer border-top-0 pt-0">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary px-4" id="view-save">Save Changes</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Action Modal -->
-<div class="modal fade" id="action-modal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header border-bottom-0 pb-2">
-                <h5 class="modal-title fw-semibold" id="modal-title">New Entry</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body pt-0">
-
-                <!-- Account search -->
-                <div class="mb-3">
-                    <label class="form-label text-muted small">Account</label>
-                    <div class="position-relative">
-                        <input type="text" id="modal-account-search" class="form-control" placeholder="Search by nickname or API..." autocomplete="off">
-                        <div id="modal-search-results" class="list-group position-absolute w-100 shadow" style="z-index:200; display:none; max-height:200px; overflow-y:auto;"></div>
-                    </div>
-                    <div id="modal-selected-account" class="mt-2" style="display:none;">
-                        <span class="badge bg-secondary fs-6" id="modal-selected-badge"></span>
-                        <button type="button" class="btn btn-sm btn-link p-0 ms-2 text-muted" id="modal-change-account">Change</button>
-                    </div>
-                </div>
-
-                <!-- Deposit-only: Network -->
-                <div id="deposit-fields">
-                    <div class="mb-3">
-                        <label class="form-label text-muted small">Network</label>
-                        <select id="modal-network" class="form-select">
-                            <option value="">— Select network —</option>
-                            {% for n in networks %}
-                            <option value="{{ n.id }}">{{ n.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Amount (shared) -->
-                <div class="mb-3">
-                    <label class="form-label text-muted small">Amount</label>
-                    <input type="number" id="modal-amount" class="form-control" step="0.01" min="0" placeholder="0.00">
-                </div>
-
-                <!-- Deposit-only: Wallet Name + Address -->
-                <div id="deposit-wallet-fields">
-                    <div class="mb-3">
-                        <label class="form-label text-muted small">Wallet Name</label>
-                        <input type="text" id="modal-wallet-name" class="form-control" placeholder="e.g. MEXC, Binance, OKX...">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label text-muted small">Wallet Address</label>
-                        <input type="text" id="modal-wallet-address" class="form-control" placeholder="0xN13Bvsd...">
-                    </div>
-                </div>
-
-                <div id="modal-error" class="alert alert-danger py-2 mb-0" style="display:none;"></div>
-            </div>
-            <div class="modal-footer border-top-0 pt-0">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary px-4" id="modal-confirm">Confirm</button>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -263,13 +130,7 @@ function getCsrf() {
         .find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
 }
 
-var currentAction = null;
-var modalSelectedAccountId = null;
 var filterSelectedNick = '';
-var viewModal = new bootstrap.Modal(document.getElementById('view-modal'));
-var currentEditEntry = null;
-
-var actionModal = new bootstrap.Modal(document.getElementById('action-modal'));
 
 // ── Filter search autocomplete ──────────────────────────────────────────────
 var filterSearchTimer = null;
@@ -380,15 +241,10 @@ function loadHistory(params) {
                     '<td>' + opBadge + '</td>' +
                     '<td class="text-end pe-4">' + amountHtml + '</td>' +
                     '<td class="ps-4">' + statusBadge + '</td>' +
-                    '<td class="pe-3 text-end"><button class="btn btn-sm btn-outline-primary btn-view" data-entry=\'' + JSON.stringify(e) + '\'>View</button></td>';
+                    '<td class="pe-3 text-end"><a href="/deposit-withdrawal/entry/' + e.type + '/' + e.id + '/" class="btn btn-sm btn-outline-primary">View</a></td>';
                 tbody.appendChild(tr);
             });
 
-            document.querySelectorAll('.btn-view').forEach(function (btn) {
-                btn.addEventListener('click', function () {
-                    openViewModal(JSON.parse(this.dataset.entry));
-                });
-            });
         });
 }
 
@@ -416,200 +272,6 @@ document.getElementById('btn-clear').addEventListener('click', function () {
     document.getElementById('filter-to').value = '';
     document.getElementById('filter-status').value = '';
     loadHistory();
-});
-
-// ── Modal: account search ───────────────────────────────────────────────────
-var modalSearchTimer = null;
-var modalSearchInput = document.getElementById('modal-account-search');
-var modalResults = document.getElementById('modal-search-results');
-
-modalSearchInput.addEventListener('input', function () {
-    clearTimeout(modalSearchTimer);
-    var q = this.value.trim();
-    if (q.length < 1) { modalResults.style.display = 'none'; return; }
-    modalSearchTimer = setTimeout(function () {
-        fetch('/account-search/?q=' + encodeURIComponent(q))
-            .then(r => r.json())
-            .then(function (data) {
-                modalResults.innerHTML = '';
-                if (!data.results.length) {
-                    modalResults.innerHTML = '<div class="list-group-item text-muted">No accounts found</div>';
-                    modalResults.style.display = '';
-                    return;
-                }
-                data.results.forEach(function (acc) {
-                    var item = document.createElement('a');
-                    item.href = '#';
-                    item.className = 'list-group-item list-group-item-action py-2';
-                    item.textContent = acc.nick + ' (' + (acc.platform || 'N/A') + ')';
-                    item.addEventListener('click', function (e) {
-                        e.preventDefault();
-                        modalSelectedAccountId = acc.id;
-                        document.getElementById('modal-selected-badge').textContent = acc.nick + ' (' + (acc.platform || 'N/A') + ')';
-                        document.getElementById('modal-selected-account').style.display = '';
-                        modalSearchInput.style.display = 'none';
-                        modalResults.style.display = 'none';
-                    });
-                    modalResults.appendChild(item);
-                });
-                modalResults.style.display = '';
-            });
-    }, 250);
-});
-
-document.getElementById('modal-change-account').addEventListener('click', function () {
-    modalSelectedAccountId = null;
-    modalSearchInput.value = '';
-    modalSearchInput.style.display = '';
-    document.getElementById('modal-selected-account').style.display = 'none';
-    modalSearchInput.focus();
-});
-
-// ── New Deposit / Withdrawal buttons ────────────────────────────────────────
-document.getElementById('btn-new-deposit').addEventListener('click', function () {
-    openModal('deposit');
-});
-document.getElementById('btn-new-withdrawal').addEventListener('click', function () {
-    openModal('withdrawal');
-});
-
-function openModal(action) {
-    currentAction = action;
-    var isDeposit = action === 'deposit';
-
-    document.getElementById('modal-title').textContent = isDeposit ? 'New Deposit' : 'New Withdrawal';
-    document.getElementById('modal-confirm').className = 'btn px-4 ' + (isDeposit ? 'btn-danger' : 'btn-success');
-    document.getElementById('modal-confirm').textContent = isDeposit ? 'Record Deposit' : 'Record Withdrawal';
-
-    document.getElementById('deposit-fields').style.display = isDeposit ? '' : 'none';
-    document.getElementById('deposit-wallet-fields').style.display = isDeposit ? '' : 'none';
-
-    // Reset fields
-    modalSelectedAccountId = null;
-    modalSearchInput.value = '';
-    modalSearchInput.style.display = '';
-    document.getElementById('modal-selected-account').style.display = 'none';
-    document.getElementById('modal-network').value = '';
-    document.getElementById('modal-amount').value = '';
-    document.getElementById('modal-wallet-name').value = '';
-    document.getElementById('modal-wallet-address').value = '';
-    document.getElementById('modal-error').style.display = 'none';
-
-    actionModal.show();
-    setTimeout(function () { modalSearchInput.focus(); }, 350);
-}
-
-// ── Confirm ──────────────────────────────────────────────────────────────────
-document.getElementById('modal-confirm').addEventListener('click', submitEntry);
-
-function submitEntry() {
-    var errDiv = document.getElementById('modal-error');
-    errDiv.style.display = 'none';
-
-    if (!modalSelectedAccountId) {
-        errDiv.textContent = 'Please select an account';
-        errDiv.style.display = '';
-        return;
-    }
-    var amount = document.getElementById('modal-amount').value;
-    if (!amount || parseFloat(amount) <= 0) {
-        errDiv.textContent = 'Enter a valid amount';
-        errDiv.style.display = '';
-        return;
-    }
-
-    var url = currentAction === 'deposit' ? '/deposit/create/' : '/withdrawal/create/';
-    var body = { account_id: modalSelectedAccountId, amount: parseFloat(amount) };
-
-    if (currentAction === 'deposit') {
-        var networkId = document.getElementById('modal-network').value;
-        body.network_id = networkId ? parseInt(networkId) : null;
-        body.wallet_name = document.getElementById('modal-wallet-name').value.trim();
-        body.wallet = document.getElementById('modal-wallet-address').value.trim();
-    }
-
-    document.getElementById('modal-confirm').disabled = true;
-
-    fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
-        body: JSON.stringify(body)
-    })
-    .then(r => r.json())
-    .then(function (data) {
-        document.getElementById('modal-confirm').disabled = false;
-        if (data.error) { errDiv.textContent = data.error; errDiv.style.display = ''; return; }
-        actionModal.hide();
-        loadHistory();
-    })
-    .catch(function () {
-        document.getElementById('modal-confirm').disabled = false;
-        errDiv.textContent = 'An error occurred. Please try again.';
-        errDiv.style.display = '';
-    });
-}
-
-// ── View / Edit modal ─────────────────────────────────────────────────────────
-function openViewModal(entry) {
-    currentEditEntry = entry;
-    var isDeposit = entry.type === 'deposit';
-
-    document.getElementById('view-modal-title').textContent =
-        (isDeposit ? 'Deposit' : 'Withdrawal') + ' — ' + entry.account;
-    document.getElementById('view-account').textContent = entry.account;
-    document.getElementById('view-platform').textContent = entry.platform || '—';
-
-    document.getElementById('view-network').value = entry.network_id || '';
-    document.getElementById('view-amount').value = entry.amount;
-    document.getElementById('view-wallet-name').value = entry.wallet_name || '';
-    document.getElementById('view-wallet-address').value = entry.wallet || '';
-    document.getElementById('view-status').value = entry.status || 'pending';
-    document.getElementById('view-error').style.display = 'none';
-
-    viewModal.show();
-}
-
-document.getElementById('view-save').addEventListener('click', function () {
-    var errDiv = document.getElementById('view-error');
-    errDiv.style.display = 'none';
-
-    var amount = document.getElementById('view-amount').value;
-    if (!amount || parseFloat(amount) <= 0) {
-        errDiv.textContent = 'Enter a valid amount';
-        errDiv.style.display = '';
-        return;
-    }
-
-    var networkId = document.getElementById('view-network').value;
-    var body = {
-        type: currentEditEntry.type,
-        id: currentEditEntry.id,
-        amount: parseFloat(amount),
-        network_id: networkId ? parseInt(networkId) : null,
-        wallet_name: document.getElementById('view-wallet-name').value.trim(),
-        wallet: document.getElementById('view-wallet-address').value.trim(),
-        status: document.getElementById('view-status').value,
-    };
-
-    this.disabled = true;
-
-    fetch('/dw-entry/update/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
-        body: JSON.stringify(body),
-    })
-    .then(r => r.json())
-    .then(function (data) {
-        document.getElementById('view-save').disabled = false;
-        if (data.error) { errDiv.textContent = data.error; errDiv.style.display = ''; return; }
-        viewModal.hide();
-        loadHistory(window._lastHistoryParams || {});
-    })
-    .catch(function () {
-        document.getElementById('view-save').disabled = false;
-        errDiv.textContent = 'An error occurred. Please try again.';
-        errDiv.style.display = '';
-    });
 });
 
 // ── Load on page ready ───────────────────────────────────────────────────────
