@@ -12,17 +12,13 @@
         </a>
     </div>
 
-    <form method="get" class="mb-4">
-        <div class="input-group">
-            <input type="text" name="q" class="form-control" placeholder="Search countries..." value="{{ q }}">
-            <button class="btn btn-outline-secondary" type="submit">
-                <i class="bi bi-search"></i>
-            </button>
-            {% if q %}
-            <a href="{% url 'country_blacklist' %}" class="btn btn-outline-danger">Clear</a>
-            {% endif %}
-        </div>
-    </form>
+    <div class="input-group mb-4">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="text" id="live-search" class="form-control" placeholder="Search countries or platforms...">
+        <button class="btn btn-outline-secondary" id="btn-clear-search" style="display:none;">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
 
     <div class="card shadow-sm">
         <div class="card-body p-0">
@@ -33,14 +29,36 @@
                         <th>Country</th>
                         <th>Added by</th>
                         <th>Added at</th>
+						<th>Platform</th>
+						<th></th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="country-tbody">
+                    <tr id="no-results-row" style="display:none;">
+                        <td colspan="5" class="text-center text-muted py-3">No results match your search.</td>
+                    </tr>
                     {% for c in countries %}
                     <tr>
-                        <td class="fw-semibold">{{ c.country }}</td>
-                        <td>{{ c.created_by.username|default:"-" }}</td>
                         <td>{{ c.created_at|date:"Y-m-d H:i" }}</td>
+                        <td>{{ c.created_by.username|default:"-" }}</td>
+                        <td class="fw-semibold">{{ c.country }}</td>
+						<td>
+						    {% with platforms=c.platforms.all %}
+						    {% for p in platforms|slice:":3" %}
+						        <span class="badge bg-secondary me-1">{{ p.name }}</span>
+						    {% empty %}
+						        <span class="text-muted small">—</span>
+						    {% endfor %}
+						    {% if platforms.count > 3 %}
+						        <span class="text-muted small">+{{ platforms.count|add:"-3" }} more</span>
+						    {% endif %}
+						    {% endwith %}
+						</td>
+						<td>
+						    <a href="{% url 'country_blacklist_detail' c.pk %}" class="btn btn-sm btn-outline-primary">
+						        <i class="bi bi-pencil-square"></i> Manage
+						    </a>
+						</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -48,11 +66,42 @@
             {% else %}
             <div class="text-center text-muted py-5">
                 <i class="bi bi-slash-circle fs-1"></i>
-                <p class="mt-2">No blacklisted countries{% if q %} matching "{{ q }}"{% endif %}.</p>
+                <p class="mt-2">No blacklisted countries.</p>
             </div>
             {% endif %}
         </div>
     </div>
 
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var input = document.getElementById('live-search');
+    var clearBtn = document.getElementById('btn-clear-search');
+    var rows = Array.from(document.querySelectorAll('#country-tbody tr'));
+    var noResults = document.getElementById('no-results-row');
+
+    function filter() {
+        var q = input.value.trim().toLowerCase();
+        clearBtn.style.display = q ? '' : 'none';
+        var visible = 0;
+        rows.forEach(function (row) {
+            var text = row.textContent.toLowerCase();
+            var show = !q || text.includes(q);
+            row.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+        if (noResults) noResults.style.display = visible === 0 ? '' : 'none';
+    }
+
+    input.addEventListener('input', filter);
+    clearBtn.addEventListener('click', function () {
+        input.value = '';
+        filter();
+        input.focus();
+    });
+})();
+</script>
 {% endblock %}

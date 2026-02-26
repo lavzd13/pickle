@@ -8,7 +8,7 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db.models import Count, Q
 from django.utils import timezone
-from .models import PlaySession, AccountDetail, Payment, Location, Security, LastTransaction, PlayInfo, Deposit, Withdrawal, Network, DepositOrder, WithdrawalOrder, CountryBlackList
+from .models import PlaySession, AccountDetail, Payment, Location, Security, LastTransaction, PlayInfo, Deposit, Withdrawal, Network, DepositOrder, WithdrawalOrder, CountryBlackList, SMSPlatform
 from django.db.models import Sum
 from django.forms import modelformset_factory
 from django.http import JsonResponse, HttpResponse, Http404
@@ -1501,9 +1501,11 @@ self.addEventListener('message', function(event) {
 @user_passes_test(is_superuser)
 def country_blacklist(request):
     q = request.GET.get('q', '').strip()
-    countries = CountryBlackList.objects.all().order_by('country')
+    countries = CountryBlackList.objects.prefetch_related('platforms').all().order_by('country')
     if q:
-        countries = countries.filter(country__icontains=q)
+        countries = countries.filter(
+            Q(country__icontains=q) | Q(platforms__name__icontains=q)
+        ).distinct()
     return render(request, 'accounts/country_blacklist.html', {'countries': countries, 'q': q})
 
 
@@ -1516,3 +1518,52 @@ def country_blacklist_add(request):
             CountryBlackList.objects.create(country=country, created_by=request.user)
         return redirect('country_blacklist')
     return render(request, 'accounts/country_blacklist_add.html')
+
+@login_required
+@user_passes_test(is_superuser)
+def country_blacklist_detail(request, pk):
+    country = get_object_or_404(CountryBlackList, pk=pk)
+    if request.method == 'POST':
+        platform_id = request.POST.get('platform_id', '').strip()
+        if platform_id:
+            platform = get_object_or_404(SMSPlatform, pk=platform_id)
+            country.platforms.add(platform)
+        return redirect('country_blacklist_detail', pk=pk)
+    assigned = country.platforms.all()
+    available = SMSPlatform.objects.exclude(pk__in=assigned.values_list('pk', flat=True))
+    return render(request, 'accounts/country_blacklist_detail.html', {
+        'country': country,
+        'assigned': assigned,
+        'available': available,
+    })
+
+
+@login_required
+@user_passes_test(is_superuser)
+def sms_platform_add(request):
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        if name:
+            SMSPlatform.objects.get_or_create(name=name, defaults={'created_by': request.user})
+        return redirect('country_blacklist')
+    return render(request, 'accounts/sms_platform_add.html')
+
+
+@login_required
+@user_passes_test(is_superuser)
+def country_blacklist_delete(request, pk):
+    if request.method == 'POST':
+        country = get_object_or_404(CountryBlackList, pk=pk)
+        country.delete()
+    return redirect('country_blacklist')
+
+
+@login_required
+@user_passes_test(is_superuser)
+def country_platform_remove(request, country_pk, platform_pk):
+    if request.method == 'POST':
+        country = get_object_or_404(CountryBlackList, pk=country_pk)
+        platform = get_object_or_404(SMSPlatform, pk=platform_pk)
+        country.platforms.remove(platform)
+    return redirect('country_blacklist_detail', pk=country_pk)
+
