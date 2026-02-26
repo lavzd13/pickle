@@ -3,7 +3,7 @@ from .models import (
     AccountDetail, Payment, PlaySession, Platform,
     ProxyVpn, WalletProvider, Network,
     Location, Security, PlayInfo, LastTransaction,
-    Deposit, Withdrawal,
+    Deposit, Withdrawal, TaskLog,
 )
 
 
@@ -125,3 +125,16 @@ class WithdrawalAdmin(admin.ModelAdmin):
     list_filter = ['network', 'created_by', 'created_at']
     search_fields = ['account__nick']
     readonly_fields = ['created_at']
+
+
+@admin.register(TaskLog)
+class TaskLogAdmin(admin.ModelAdmin):
+    list_display = ['task_name', 'success', 'ran_at']
+    list_filter = ['success', 'task_name']
+    readonly_fields = ['task_name', 'ran_at', 'success', 'detail']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

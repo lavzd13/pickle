@@ -14,6 +14,13 @@ services:
     networks:
       - app-network
 
+  redis:
+    build: .
+    restart: unless-stopped
+    command: redis-server --bind 0.0.0.0 --daemonize no
+    networks:
+      - app-network
+
   web:
     build: .
     restart: unless-stopped
@@ -35,6 +42,35 @@ services:
       - .env
     depends_on:
       - db
+      - redis
+    networks:
+      - app-network
+
+  celery-worker:
+    build: .
+    restart: unless-stopped
+    command: celery -A config worker --loglevel=info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    networks:
+      - app-network
+
+  celery-beat:
+    build: .
+    restart: unless-stopped
+    command: celery -A config beat --loglevel=info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
     networks:
       - app-network
 
