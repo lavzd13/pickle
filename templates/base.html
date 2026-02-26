@@ -179,6 +179,12 @@
                                 <i class="bi bi-people"></i> System Users
                             </a>
                         </li>
+						<li class="nav-item">
+						    <a class="nav-link {% if request.resolver_match.url_name == 'country_blacklist' %}active{% endif %}" href="{% url 'country_blacklist' %}">
+						        <i class="bi bi-slash-circle me-2"></i>Country Blacklist
+						    </a>
+						</li>
+
                         {% endif %}
                     </ul>
                     

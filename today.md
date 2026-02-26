@@ -5,8 +5,8 @@ Regarding sound, SOUND MUST BE ENABLED IN THE BROWSER BECAUSE THAT IS FUCKING HI
 TODO:
 
 
-
 DONE:
+- PAUSE SYSTEM NOT WORKING PROPERLY, NEEDS TO BE FIXED. IT IS NOT ACTUALLY PAUSING THE TIME
 - Creation date of the pokerclans account field (date when it was registered in app)
 - Withdrawal balance make it more clear
 - Put default value for withdrawal balance to be 1400. Also change the name of it, make smth better

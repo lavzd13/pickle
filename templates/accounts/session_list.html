@@ -68,7 +68,11 @@
                     {% for entry in daily_entries %}
                     <tr>
                         <td>
-                            <strong>{{ entry.account.nick }}</strong><br>
+                            <strong>{{ entry.account.nick }}</strong>
+                            {% if entry.has_ongoing %}
+                            <span class="badge bg-success ms-1">Ongoing</span>
+                            {% endif %}
+                            <br>
                             <small class="text-muted">{{ entry.account.email }}</small>
                         </td>
                         <td>{{ entry.session_date|date:"Y-m-d" }}</td>

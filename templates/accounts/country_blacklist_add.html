@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block title %}Add Country to Blacklist{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 500px;">
+
+    <div class="d-flex align-items-center mb-4 gap-3">
+        <a href="{% url 'country_blacklist' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <h4 class="mb-0 fw-semibold">Add Country to Blacklist</h4>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label">Country name</label>
+                    <input type="text" name="country" class="form-control" placeholder="e.g. Nigeria" required autofocus>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Add to Blacklist</button>
+                    <a href="{% url 'country_blacklist' %}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

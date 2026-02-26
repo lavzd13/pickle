@@ -30,8 +30,8 @@ urlpatterns = [
     path('users/<int:pk>/edit/', web_views.user_edit, name='user_edit'),
     path('users/<int:pk>/delete/', web_views.user_delete, name='user_delete'),
 
-	# Play
-	path('play/', web_views.play, name='play'),
+    # Play
+    path('play/', web_views.play, name='play'),
     path('play/eligible-account/', web_views.eligible_account, name='eligible_account'),
     path('play/start-session/', web_views.start_session_play, name='start_session_play'),
     path('play/finish-session/', web_views.finish_session_play, name='finish_session_play'),
@@ -58,6 +58,11 @@ urlpatterns = [
     path('deposit-withdrawal/reports/', web_views.deposit_withdrawal_reports, name='deposit_withdrawal_reports'),
     path('deposit-withdrawal/history/', web_views.deposit_withdrawal_history, name='deposit_withdrawal_history'),
     path('account-search/', web_views.account_search, name='account_search'),
+
+    # Country Blacklist
+    path('country-blacklist/', web_views.country_blacklist, name='country_blacklist'),
+    path('country-blacklist/add/', web_views.country_blacklist_add, name='country_blacklist_add'),
+
 
     # Service Worker (must be at root for full scope)
     path('sw.js', web_views.service_worker_js, name='service_worker_js'),
