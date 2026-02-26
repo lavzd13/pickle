@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block title %}Add SMS Platform{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 500px;">
+
+    <div class="d-flex align-items-center mb-4 gap-3">
+        <a href="{% url 'country_blacklist' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <h4 class="mb-0 fw-semibold">Add SMS Platform</h4>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label">Platform name</label>
+                    <input type="text" name="name" class="form-control" placeholder="e.g. Twilio" required autofocus>
+                    <div class="form-text">Platform names must be unique. If it already exists it will not be duplicated.</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Add Platform</button>
+                    <a href="{% url 'country_blacklist' %}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

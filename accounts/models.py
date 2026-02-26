@@ -349,12 +349,27 @@ class WithdrawalOrder(models.Model):
     def __str__(self):
         return f"WithdrawalOrder {self.account.nick}"
 
+class SMSPlatform(models.Model):
+    """Global list of SMS platforms available for selection"""
+    name = models.CharField(blank=False)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='sms_platforms')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'sms_platform'
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name}"
+
+
 class CountryBlackList(models.Model):
     """Countries which are on blacklist because of SMS not arriving on grizzly"""
     country = models.CharField(blank=True)
+    platforms = models.ManyToManyField(SMSPlatform, blank=True, related_name='countries')
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='country_blacklist')
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         db_table = 'country_blacklist'
 

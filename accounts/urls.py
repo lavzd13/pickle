@@ -62,6 +62,10 @@ urlpatterns = [
     # Country Blacklist
     path('country-blacklist/', web_views.country_blacklist, name='country_blacklist'),
     path('country-blacklist/add/', web_views.country_blacklist_add, name='country_blacklist_add'),
+    path('country-blacklist/<int:pk>/', web_views.country_blacklist_detail, name='country_blacklist_detail'),
+    path('country-blacklist/<int:pk>/delete/', web_views.country_blacklist_delete, name='country_blacklist_delete'),
+    path('country-blacklist/<int:country_pk>/platform/<int:platform_pk>/remove/', web_views.country_platform_remove, name='country_platform_remove'),
+    path('sms-platform/add/', web_views.sms_platform_add, name='sms_platform_add'),
 
 
     # Service Worker (must be at root for full scope)

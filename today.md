@@ -4,6 +4,7 @@ Regarding sound, SOUND MUST BE ENABLED IN THE BROWSER BECAUSE THAT IS FUCKING HI
 
 TODO:
 - Start doing work on user ordering part (telegram bot with orders)
+- Add SMSplatform in country blacklist
 
 DONE:
 - PAUSE SYSTEM NOT WORKING PROPERLY, NEEDS TO BE FIXED. IT IS NOT ACTUALLY PAUSING THE TIME
