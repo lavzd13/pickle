@@ -8,7 +8,7 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db.models import Count, Q
 from django.utils import timezone
-from .models import PlaySession, AccountDetail, Payment, Location, Security, LastTransaction, PlayInfo, Deposit, Withdrawal, Network, DepositOrder, WithdrawalOrder
+from .models import PlaySession, AccountDetail, Payment, Location, Security, LastTransaction, PlayInfo, Deposit, Withdrawal, Network, DepositOrder, WithdrawalOrder, CountryBlackList
 from django.db.models import Sum
 from django.forms import modelformset_factory
 from django.http import JsonResponse, HttpResponse, Http404
@@ -113,6 +113,8 @@ def _group_sessions_by_day(sessions):
         hours = total_seconds // 3600
         minutes = (total_seconds % 3600) // 60
 
+        has_ongoing = any(s.is_active and not s.is_pending and not s.is_done for s in day_sessions)
+
         result.append({
             'account': day_sessions[0].account,
             'session_date': session_date,
@@ -122,6 +124,7 @@ def _group_sessions_by_day(sessions):
             'total_duration_display': f"{hours}h {minutes}m" if hours else f"{minutes}m",
             'created_by': day_sessions[0].created_by,
             'notes': '; '.join(s.notes for s in day_sessions if s.notes),
+            'has_ongoing': has_ongoing,
         })
 
     result.sort(key=lambda x: x['session_date'], reverse=True)
@@ -300,7 +303,7 @@ def manage_day_sessions(request, account_id, date):
 @user_passes_test(is_superuser)
 def account_list(request):
     """List all accounts (superuser only)"""
-    all_accounts = AccountDetail.objects.all().select_related('payment', 'last_transaction')
+    all_accounts = AccountDetail.objects.all().select_related('payment', 'last_transaction').order_by('creation_date', 'id')
 
     groups = [
         ('Active',   'acc-active',   [a for a in all_accounts if a.is_active]),
@@ -850,20 +853,23 @@ def active_sessions(request):
 
     done_result = []
     for s in done_qs:
-        try:
-            meta = _json.loads(s.notes or '{}')
-            if 'remaining_after' in meta:
-                remaining_after = int(meta['remaining_after'])
-            else:
+        import re as _re
+        notes = s.notes or ''
+        m = _re.search(r'Remaining:\s*(\d+)', notes)
+        if m:
+            remaining_after = int(m.group(1))
+        else:
+            try:
+                meta = _json.loads(notes)
                 r = int(meta.get('r', 0))
-                start_dt = _dt.combine(today, s.start_time)
-                end_dt = _dt.combine(today, s.end_time)
-                if end_dt < start_dt:
-                    end_dt += timedelta(days=1)
-                actual_minutes = int((end_dt - start_dt).total_seconds() / 60)
-                remaining_after = max(0, r - actual_minutes)
-        except Exception:
-            remaining_after = 0
+            except Exception:
+                r = 0
+            start_dt = _dt.combine(today, s.start_time)
+            end_dt = _dt.combine(today, s.end_time)
+            if end_dt < start_dt:
+                end_dt += timedelta(days=1)
+            actual_minutes = int((end_dt - start_dt).total_seconds() / 60)
+            remaining_after = max(0, r - actual_minutes)
         acc = s.account
         done_result.append({
             'session_id': s.id,
@@ -971,7 +977,7 @@ def finish_session_play(request):
     remaining_after = max(0, r - actual_minutes)
 
     session.is_active = False
-    session.notes = _json.dumps({'d': given_duration, 'r': r, 'actual': actual_minutes, 'remaining_after': remaining_after})
+    session.notes = f"Given duration: {given_duration} min; Actual duration: {actual_minutes} min; Remaining: {remaining_after} min"
     session.save(update_fields=['is_active', 'notes'])
 
     return JsonResponse({'ok': True})
@@ -1010,13 +1016,13 @@ def resume_session_play(request):
     if session.paused and session.pause_time:
         # Calculate how long it was paused
         paused_duration = timezone.now() - session.pause_time
-        paused_minutes = int(paused_duration.total_seconds() / 60)
+        paused_seconds = int(paused_duration.total_seconds())
 
         # Extend end_time by the paused duration
         from datetime import datetime, timedelta
         today = session.session_date
         current_end = datetime.combine(today, session.end_time)
-        new_end = current_end + timedelta(minutes=paused_minutes)
+        new_end = current_end + timedelta(seconds=paused_seconds)
         session.end_time = new_end.time()
 
         # Clear pause state
@@ -1074,7 +1080,7 @@ def stop_session(request):
     session.is_done = True
     session.paused = False
     session.break_until = timezone.now() + timedelta(minutes=break_minutes)
-    session.notes = _json.dumps({'d': given_duration, 'r': r, 'actual': actual_minutes, 'remaining_after': remaining_after})
+    session.notes = f"Given duration: {given_duration} min; Actual duration: {actual_minutes} min; Remaining: {remaining_after} min"
     session.save(update_fields=['end_time', 'is_done', 'paused', 'break_until', 'notes'])
 
     return JsonResponse({'ok': True, 'remaining_after': remaining_after})
@@ -1490,3 +1496,23 @@ self.addEventListener('message', function(event) {
 });
 """
     return HttpResponse(js, content_type='application/javascript')
+
+@login_required
+@user_passes_test(is_superuser)
+def country_blacklist(request):
+    q = request.GET.get('q', '').strip()
+    countries = CountryBlackList.objects.all().order_by('country')
+    if q:
+        countries = countries.filter(country__icontains=q)
+    return render(request, 'accounts/country_blacklist.html', {'countries': countries, 'q': q})
+
+
+@login_required
+@user_passes_test(is_superuser)
+def country_blacklist_add(request):
+    if request.method == 'POST':
+        country = request.POST.get('country', '').strip()
+        if country:
+            CountryBlackList.objects.create(country=country, created_by=request.user)
+        return redirect('country_blacklist')
+    return render(request, 'accounts/country_blacklist_add.html')
