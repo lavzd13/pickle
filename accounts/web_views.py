@@ -1251,6 +1251,9 @@ def deposit_order_create(request):
         created_by=request.user,
     )
 
+    from .telegram import notify_deposit_order
+    notify_deposit_order(order)
+
     return JsonResponse({
         'id': order.id,
         'account': account.nick,
@@ -1277,6 +1280,9 @@ def withdrawal_order_create(request):
         current_balance=data.get('current_balance') or None,
         created_by=request.user,
     )
+
+    from .telegram import notify_withdrawal_order
+    notify_withdrawal_order(order)
 
     return JsonResponse({
         'id': order.id,

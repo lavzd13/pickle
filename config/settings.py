@@ -128,3 +128,7 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(hour=23, minute=0, day_of_week=0),  # Sunday 23:00 Europe/Zagreb
     },
 }
+
+# Telegram bot
+TELEGRAM_BOT_TOKEN = config('TELEGRAM_TOKEN', default='')
+TELEGRAM_CHAT_ID = config('TELEGRAM_CHAT_ID', default='')
