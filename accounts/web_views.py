@@ -1424,12 +1424,16 @@ def deposit_withdrawal_history(request):
     if date_to:
         dep_qs = dep_qs.filter(created_at__date__lte=date_to)
         wd_qs = wd_qs.filter(created_at__date__lte=date_to)
-    if status:
+    if status == 'active':
+        dep_qs = dep_qs.filter(status__in=['pending', 'completed'])
+        wd_qs = wd_qs.filter(status__in=['pending', 'completed'])
+    elif status:
         dep_qs = dep_qs.filter(status=status)
         wd_qs = wd_qs.filter(status=status)
 
     total_deposits = dep_qs.aggregate(total=Sum('amount'))['total'] or 0
     total_withdrawals = wd_qs.aggregate(total=Sum('amount'))['total'] or 0
+
 
     entries = []
     for e in dep_qs:
