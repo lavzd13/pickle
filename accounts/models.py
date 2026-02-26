@@ -375,3 +375,18 @@ class CountryBlackList(models.Model):
 
     def __str__(self):
         return f"{self.country}"
+
+
+class TaskLog(models.Model):
+    task_name = models.CharField(max_length=200)
+    ran_at = models.DateTimeField(auto_now_add=True)
+    success = models.BooleanField()
+    detail = models.TextField(blank=True, default='')
+
+    class Meta:
+        db_table = 'task_log'
+        ordering = ['-ran_at']
+
+    def __str__(self):
+        status = 'OK' if self.success else 'FAIL'
+        return f"[{status}] {self.task_name} @ {self.ran_at:%Y-%m-%d %H:%M}"
