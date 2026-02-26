@@ -149,8 +149,8 @@
                                 <i class="bi bi-controller"></i> Sessions
                             </a>
                         </li>
-						{% endif %}
-						<li class="nav-item">
+                        {% endif %}
+                        <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'play' %}active{% endif %}" href="{% url 'play' %}">
                                 <i class="bi bi-controller"></i> Play
                             </a>
@@ -161,13 +161,12 @@
                                 <i class="bi bi-cash-stack"></i> Deposits & Withdrawals
                             </a>
                         </li>
-                        {% else %}
+                        {% endif %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'deposit_withdrawal' %}active{% endif %}" href="{% url 'deposit_withdrawal' %}">
                                 <i class="bi bi-inbox"></i> Order
                             </a>
                         </li>
-                        {% endif %}
                         {% if user.is_superuser %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'account_list' %}active{% endif %}" href="{% url 'account_list' %}">
@@ -179,11 +178,11 @@
                                 <i class="bi bi-people"></i> System Users
                             </a>
                         </li>
-						<li class="nav-item">
-						    <a class="nav-link {% if request.resolver_match.url_name == 'country_blacklist' %}active{% endif %}" href="{% url 'country_blacklist' %}">
-						        <i class="bi bi-slash-circle me-2"></i>Country Blacklist
-						    </a>
-						</li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'country_blacklist' %}active{% endif %}" href="{% url 'country_blacklist' %}">
+                                <i class="bi bi-slash-circle me-2"></i>Country Blacklist
+                            </a>
+                        </li>
 
                         {% endif %}
                     </ul>
