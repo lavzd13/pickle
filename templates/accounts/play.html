@@ -695,6 +695,27 @@
 
                     if (card._state === 'done' || card._state === 'stopping') return;
 
+                    // Pending card was started in another tab/browser — transition to playing
+                    if (card._state === 'pending') {
+                        clearInterval(card._pendingInterval);
+                        card._state = 'playing';
+                        card._secondsLeft = s.seconds_left;
+                        card.querySelector('.card-pending-section').style.display = 'none';
+                        card.querySelector('.card-running-section').style.display = 'block';
+                        card.querySelector('.card-status').textContent = 'Playing';
+                        card.querySelector('.card-status').className = 'badge bg-success card-status';
+                        card.querySelector('.card-quit-btn').style.display = 'none';
+                        card.style.backgroundColor = '#d1f5d3';
+                        card.style.borderColor = '#6dbb74';
+                        updateTimerDisplay(card, s.seconds_left);
+                        updateEndTimeDisplay(card, s.seconds_left);
+                        card.dataset.sortPriority = '4';
+                        card.dataset.endMs = String(Date.now() + s.seconds_left * 1000);
+                        setupPauseResume(card, s.session_id, s.account.id);
+                        sortSessionCards();
+                        return;
+                    }
+
                     // Server says timed out
                     if (s.timed_out) {
                         if (card._state !== 'timedout') onTimerExpired(card);

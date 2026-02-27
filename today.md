@@ -3,10 +3,9 @@ Regarding sound, SOUND MUST BE ENABLED IN THE BROWSER BECAUSE THAT IS FUCKING HI
 !!! SOUND WORKS NOW !!!
 
 TODO:
-- Fix redis issue on the server, try to make it work without redis-server install
-- ADD FUCKING TELEGRAM TOKEN AND CHAT ID ON THE SERVER THAT IS FUCKING ISSUE
 
 DONE:
+- ADD FUCKING TELEGRAM TOKEN AND CHAT ID ON THE SERVER THAT IS FUCKING ISSUE
 - Start doing work on user ordering part (telegram bot with orders)
 - Add SMSplatform in country blacklist
 - PAUSE SYSTEM NOT WORKING PROPERLY, NEEDS TO BE FIXED. IT IS NOT ACTUALLY PAUSING THE TIME

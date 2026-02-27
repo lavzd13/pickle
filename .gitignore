@@ -54,3 +54,6 @@ data/
 
 # Celery
 celerybeat-schedule
+
+# Private
+today.md
