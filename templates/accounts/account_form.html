@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static %}
+
 
 {% block title %}{{ title }} - Gaming Sessions{% endblock %}
 
@@ -58,7 +58,7 @@
                     	    {% if account_form.platform.errors %}
                     	    <div class="text-danger">{{ account_form.platform.errors }}</div>
                     	    {% endif %}
-                    	    <a href="#" class="form-text text-primary text-decoration-none" data-bs-toggle="modal" data-bs-target="#addPlatformModal">+ Add new platform</a>
+                    	    <a href="{% url 'platform_add' %}?next={{ request.path }}" class="form-text text-primary text-decoration-none">+ Add new platform</a>
                     	</div>
 
                         <div class="col-md-4 mb-3">
@@ -106,7 +106,7 @@
                             {% if payment_form.wallet_provider.errors %}
                             <div class="text-danger">{{ payment_form.wallet_provider.errors }}</div>
                             {% endif %}
-                            <a href="#" class="form-text text-primary text-decoration-none" data-bs-toggle="modal" data-bs-target="#addWalletProviderModal">+ Add new wallet provider</a>
+                            <a href="{% url 'wallet_provider_add' %}?next={{ request.path }}" class="form-text text-primary text-decoration-none">+ Add new wallet provider</a>
                         </div>
 
                         <div class="col-md-3 mb-3">
@@ -115,7 +115,7 @@
                             {% if payment_form.network.errors %}
                             <div class="text-danger">{{ payment_form.network.errors }}</div>
                             {% endif %}
-                            <a href="#" class="form-text text-primary text-decoration-none" data-bs-toggle="modal" data-bs-target="#addNetworkModal">+ Add new network</a>
+                            <a href="{% url 'network_add' %}?next={{ request.path }}" class="form-text text-primary text-decoration-none">+ Add new network</a>
                         </div>
 
                     </div>
@@ -165,7 +165,7 @@
                             {% if location_form.proxy_vpn.errors %}
                             <div class="text-danger">{{ location_form.proxy_vpn.errors }}</div>
                             {% endif %}
-                            <a href="#" class="form-text text-primary text-decoration-none" data-bs-toggle="modal" data-bs-target="#addProxyVpnModal">+ Add new proxy/VPN</a>
+                            <a href="{% url 'proxyvpn_add' %}?next={{ request.path }}" class="form-text text-primary text-decoration-none">+ Add new proxy/VPN</a>
                         </div>
                     </div>
 
@@ -266,7 +266,7 @@
                             {% if last_transaction_form.network.errors %}
                             <div class="text-danger">{{ last_transaction_form.network.errors }}</div>
                             {% endif %}
-                            <a href="#" class="form-text text-primary text-decoration-none" data-bs-toggle="modal" data-bs-target="#addNetworkModal">+ Add new network</a>
+                            <a href="{% url 'network_add' %}?next={{ request.path }}" class="form-text text-primary text-decoration-none">+ Add new network</a>
                         </div>
 
                         <div class="col-md-6 mb-3">
@@ -312,99 +312,4 @@
     </div>
 </div>
 
-<!-- Add Platform Modal -->
-<div class="modal fade" id="addPlatformModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add New Platform</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">Platform Name</label>
-                    <input type="text" id="newPlatformName" class="form-control" placeholder="Enter platform name">
-                    <div id="platformError" class="text-danger mt-1" style="display: none;"></div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="savePlatformBtn">Save Platform</button>
-            </div>
-        </div>
-    </div>
-</div>
-<!-- Add Wallet Provider Modal -->
-<div class="modal fade" id="addWalletProviderModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add New Wallet Provider</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">Wallet Provider Name</label>
-                    <input type="text" id="newWalletProviderName" class="form-control" placeholder="Enter wallet provider name">
-                    <div id="walletProviderError" class="text-danger mt-1" style="display: none;"></div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="saveWalletProviderBtn">Save Wallet Provider</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Add Network Modal -->
-<div class="modal fade" id="addNetworkModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add New Network</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">Network Name</label>
-                    <input type="text" id="newNetworkName" class="form-control" placeholder="Enter network name">
-                    <div id="networkError" class="text-danger mt-1" style="display: none;"></div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="saveNetworkBtn">Save Network</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Add Proxy/VPN Modal -->
-<div class="modal fade" id="addProxyVpnModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add New Proxy/VPN</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">Proxy/VPN Name</label>
-                    <input type="text" id="newProxyVpnName" class="form-control" placeholder="Enter proxy/VPN name">
-                    <div id="proxyVpnError" class="text-danger mt-1" style="display: none;"></div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="saveProxyVpnBtn">Save Proxy/VPN</button>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block extra_js %}
-<script src="{% static 'js/platform_modal.js' %}"></script>
-<script src="{% static 'js/network_modal.js' %}"></script>
 {% endblock %}

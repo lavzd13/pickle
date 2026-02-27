@@ -6,13 +6,13 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.contrib.auth.models import User
-from django.db.models import Count, Q
+from django.db.models import Q
 from django.utils import timezone
-from .models import PlaySession, AccountDetail, Payment, Location, Security, LastTransaction, PlayInfo, Deposit, Withdrawal, Network, DepositOrder, WithdrawalOrder, CountryBlackList, SMSPlatform
+from .models import PlaySession, AccountDetail, Payment, Location, Security, LastTransaction, PlayInfo, Deposit, Withdrawal, Network, Platform, ProxyVpn, WalletProvider, DepositOrder, WithdrawalOrder, CountryBlackList, SMSPlatform
 from django.db.models import Sum
 from django.forms import modelformset_factory
 from django.http import JsonResponse, HttpResponse, Http404
-from .forms import PlaySessionForm, DaySessionForm, AccountDetailForm, PaymentForm, UserCreateForm, UserEditForm, PlatformForm, LocationForm, SecurityForm, LastTransactionForm
+from .forms import PlaySessionForm, DaySessionForm, AccountDetailForm, PaymentForm, UserCreateForm, UserEditForm, LocationForm, SecurityForm, LastTransactionForm
 
 
 def gaussian_sample(min_val, max_val, median=None):
@@ -25,12 +25,10 @@ def gaussian_sample(min_val, max_val, median=None):
     mu = median if median is not None else (min_val + max_val) / 2
     sigma = (max_val - min_val) / 6
 
-    res = 0
     value = random.gauss(mu, sigma)
     value = max(min_val, min(max_val, value))
-    res = value
 
-    return res
+    return value
 
 def calculate_play_info(account):
     days_of_the_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -586,15 +584,11 @@ def play(request):
 @login_required
 def get_random_accounts(request):
     """Return 3 random gaming accounts as JSON."""
-    # Get accounts the user has access to
-    if request.user.is_superuser:
-        accounts = list(AccountDetail.objects.all())
-    else:
-        accounts = list(AccountDetail.objects.filter(created_by=request.user))
-    
+    accounts = list(AccountDetail.objects.select_related('platform', 'payment', 'location').all())
+
     # Get 3 random accounts (or fewer if not enough exist)
     random_accounts = random.sample(accounts, min(3, len(accounts)))
-    
+
     # Format the data
     data = []
     for acc in random_accounts:
@@ -603,11 +597,11 @@ def get_random_accounts(request):
             'nick': acc.nick,
             'platform': str(acc.platform) if acc.platform else '',
             'phone': acc.phone or '',
-            'country': acc.country,
+            'country': acc.location.country if hasattr(acc, 'location') else '',
             'withdraw_pass': acc.payment.withdraw_pass if hasattr(acc, 'payment') else '',
             'min_balance': str(acc.payment.min_balance) if hasattr(acc, 'payment') else '0.00',
         })
-    
+
     return JsonResponse({'accounts': data})
 
 
@@ -1557,6 +1551,54 @@ def sms_platform_add(request):
             SMSPlatform.objects.get_or_create(name=name, defaults={'created_by': request.user})
         return redirect('country_blacklist')
     return render(request, 'accounts/sms_platform_add.html')
+
+
+@login_required
+@user_passes_test(is_superuser)
+def platform_add(request):
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        if name:
+            Platform.objects.get_or_create(name=name)
+        next_url = request.POST.get('next') or 'account_create'
+        return redirect(next_url)
+    return render(request, 'accounts/platform_add.html')
+
+
+@login_required
+@user_passes_test(is_superuser)
+def network_add(request):
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        if name:
+            Network.objects.get_or_create(name=name)
+        next_url = request.POST.get('next') or 'account_create'
+        return redirect(next_url)
+    return render(request, 'accounts/network_add.html')
+
+
+@login_required
+@user_passes_test(is_superuser)
+def proxyvpn_add(request):
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        if name:
+            ProxyVpn.objects.get_or_create(name=name)
+        next_url = request.POST.get('next') or 'account_create'
+        return redirect(next_url)
+    return render(request, 'accounts/proxyvpn_add.html')
+
+
+@login_required
+@user_passes_test(is_superuser)
+def wallet_provider_add(request):
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        if name:
+            WalletProvider.objects.get_or_create(name=name)
+        next_url = request.POST.get('next') or 'account_create'
+        return redirect(next_url)
+    return render(request, 'accounts/wallet_provider_add.html')
 
 
 @login_required

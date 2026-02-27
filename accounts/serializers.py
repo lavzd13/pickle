@@ -42,7 +42,7 @@ class AccountDetailSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = AccountDetail
-        fields = ['id', 'nick', 'country', 'email', 'phone', 'payment', 'created_at', 'updated_at']
+        fields = ['id', 'nick', 'email', 'phone', 'payment', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
 
 
