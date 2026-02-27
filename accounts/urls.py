@@ -59,6 +59,12 @@ urlpatterns = [
     path('deposit-withdrawal/history/', web_views.deposit_withdrawal_history, name='deposit_withdrawal_history'),
     path('account-search/', web_views.account_search, name='account_search'),
 
+    # Entity add pages (Platform, Network, ProxyVpn, WalletProvider)
+    path('platforms/add/', web_views.platform_add, name='platform_add'),
+    path('networks/add/', web_views.network_add, name='network_add'),
+    path('proxy-vpns/add/', web_views.proxyvpn_add, name='proxyvpn_add'),
+    path('wallet-providers/add/', web_views.wallet_provider_add, name='wallet_provider_add'),
+
     # Country Blacklist
     path('country-blacklist/', web_views.country_blacklist, name='country_blacklist'),
     path('country-blacklist/add/', web_views.country_blacklist_add, name='country_blacklist_add'),

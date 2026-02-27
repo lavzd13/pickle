@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth.models import User
 from django.utils import timezone
-from .models import PlaySession, AccountDetail, Payment, Platform, PlayInfo, WalletProvider, Network, LastTransaction, Location, Security, ProxyVpn
+from .models import PlaySession, AccountDetail, Payment, WalletProvider, LastTransaction, Location, Security
 
 
 class PlaySessionForm(forms.ModelForm):
@@ -27,22 +27,6 @@ class DaySessionForm(forms.ModelForm):
             'notes': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Optional notes'}),
         }
 
-
-class PlatformForm(forms.ModelForm):
-    class Meta:
-        model = Platform
-        fields = ['name']
-        widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Platfrom name'})
-        }
-        
-class ProxyVpnForm(forms.ModelForm):
-    class Meta:
-        model = ProxyVpn
-        fields = ['name']
-        widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Provider name'})
-		}
 
 class LocationForm(forms.ModelForm):
     class Meta:
@@ -118,23 +102,6 @@ class AccountDetailForm(forms.ModelForm):
             instance.save()
         return instance
         
-
-class PlayInfoForm(forms.ModelForm):
-    class Meta:
-        model = PlayInfo
-        fields = ['holiday_days_per_year', 'play_days_per_week']
-        widgets = {
-            'holiday_days_per_year': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'play_days_per_week': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-        }
-
-class NetworkForm(forms.ModelForm):
-    class Meta:
-        model = Network
-        fields = ['name']
-        widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Network'})
-		}
 
 class LastTransactionForm(forms.ModelForm):
     class Meta:
