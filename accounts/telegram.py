@@ -53,13 +53,15 @@ def notify_deposit_order(order):
         }
 
     text = (
+        f"\u200b━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"🔴 <b>New Deposit Order</b>\n"
-        f"Account: <b>{order.account.nick}</b>\n"
-        f"Platform: {order.account.platform.name if order.account.platform else '—'}\n"
-        f"Network: {network_name}\n"
-        f"Current Balance: {balance}\n"
-        f"Ordered by: {order.created_by.username if order.created_by else '—'}\n"
-        f"Time: {order.created_at.strftime('%Y-%m-%d %H:%M')}"
+        f"━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 Account: <b>{order.account.nick}</b>\n"
+        f"🎮 Platform: <b>{order.account.platform.name if order.account.platform else '—'}</b>\n"
+        f"🌐 Network: <b>{network_name}</b>\n"
+        f"💰 Current Balance: <b>{balance}</b>\n"
+        f"📝 Ordered by: <b>{order.created_by.username if order.created_by else '—'}</b>\n"
+        f"🕐 Time: <b>{order.created_at.strftime('%Y-%m-%d %H:%M')}</b>"
     )
     send_telegram_message(text, reply_markup=reply_markup)
 
@@ -69,11 +71,13 @@ def notify_withdrawal_order(order):
     balance = order.current_balance if order.current_balance is not None else '—'
 
     text = (
+        f"\u200b━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"🟢 <b>New Withdrawal Order</b>\n"
-        f"Account: <b>{order.account.nick}</b>\n"
-        f"Platform: {order.account.platform.name if order.account.platform else '—'}\n"
-        f"Current Balance: {balance}\n"
-        f"Ordered by: {order.created_by.username if order.created_by else '—'}\n"
-        f"Time: {order.created_at.strftime('%Y-%m-%d %H:%M')}"
+        f"━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 Account: <b>{order.account.nick}</b>\n"
+        f"🎮 Platform: <b>{order.account.platform.name if order.account.platform else '—'}</b>\n"
+        f"💰 Current Balance: <b>{balance}</b>\n"
+        f"📝 Ordered by: <b>{order.created_by.username if order.created_by else '—'}</b>\n"
+        f"🕐 Time: <b>{order.created_at.strftime('%Y-%m-%d %H:%M')}</b>"
     )
     send_telegram_message(text)
