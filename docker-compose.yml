@@ -17,7 +17,7 @@ services:
   redis:
     build: .
     restart: unless-stopped
-    command: redis-server --bind 0.0.0.0 --daemonize no
+    command: redis-server --bind 0.0.0.0 --protected-mode no --daemonize no
     networks:
       - app-network
 
