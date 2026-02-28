@@ -62,6 +62,7 @@ class AccountDetail(models.Model):
     phone = models.CharField(max_length=20, blank=True, null=True)
     is_new = models.BooleanField(default=False)
     is_active = models.BooleanField(default=False)
+    is_active_no_schedule = models.BooleanField(default=False)
     is_inactive = models.BooleanField(default=False)
     is_banned = models.BooleanField(default=False)
     creation_date = models.DateField(null=True, blank=True)

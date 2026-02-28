@@ -304,10 +304,11 @@ def account_list(request):
     all_accounts = AccountDetail.objects.all().select_related('payment', 'last_transaction').order_by('creation_date', 'id')
 
     groups = [
-        ('Active',   'acc-active',   [a for a in all_accounts if a.is_active]),
-        ('New',      'acc-new',      [a for a in all_accounts if a.is_new]),
-        ('Inactive', 'acc-inactive', [a for a in all_accounts if a.is_inactive]),
-        ('Banned',   'acc-banned',   [a for a in all_accounts if a.is_banned]),
+        ('Active',              'acc-active',              [a for a in all_accounts if a.is_active]),
+        ('Active / No Schedule','acc-active-no-schedule',  [a for a in all_accounts if a.is_active_no_schedule]),
+        ('New',                 'acc-new',                 [a for a in all_accounts if a.is_new]),
+        ('Inactive',            'acc-inactive',            [a for a in all_accounts if a.is_inactive]),
+        ('Banned',              'acc-banned',              [a for a in all_accounts if a.is_banned]),
     ]
 
     context = {
