@@ -7,7 +7,7 @@ class Command(BaseCommand):
     help = 'Regenerate weekly play schedule for all accounts'
 
     def handle(self, *args, **options):
-        accounts = AccountDetail.objects.all()
+        accounts = AccountDetail.objects.filter(is_active=True)
         total = accounts.count()
         for account in accounts:
             calculate_play_info(account)

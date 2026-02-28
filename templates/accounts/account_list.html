@@ -4,11 +4,12 @@
 
 {% block content %}
 <style>
-.acc-new      { background-color: #d6d7d9; }
-.acc-banned   { background-color: #d7aeae; }
-.acc-inactive { background-color: #a3b0cb; }
-.acc-verified { background-color: #99b8a0; }
-.acc-active   { background-color: #99b8a0; }
+.acc-new                { background-color: #d6d7d9; }
+.acc-banned             { background-color: #d7aeae; }
+.acc-inactive           { background-color: #a3b0cb; }
+.acc-verified           { background-color: #99b8a0; }
+.acc-active             { background-color: #99b8a0; }
+.acc-active-no-schedule { background-color: #c9b8e0; }
 
 .group-header {
     cursor: pointer;
@@ -70,9 +71,9 @@
     <!-- Group header -->
     <div class="group-header {{ css_class }}"
          data-bs-toggle="collapse"
-         data-bs-target="#group-{{ label|lower }}">
+         data-bs-target="#group-{{ css_class }}">
         <span>
-            {% if label == 'Active' %}☑️{% elif label == 'New' %}🆕{% elif label == 'Inactive' %}😴{% elif label == 'Banned' %}⛔{% endif %}
+            {% if label == 'Active' %}☑️{% elif label == 'Active / No Schedule' %}🟣{% elif label == 'New' %}🆕{% elif label == 'Inactive' %}😴{% elif label == 'Banned' %}⛔{% endif %}
             {{ label }}
             <span class="badge bg-secondary ms-2 fw-normal">{{ accounts|length }}</span>
         </span>
@@ -80,14 +81,14 @@
     </div>
 
     <!-- Group body -->
-    <div class="collapse{% if label == 'Active' or label == 'New' %} show{% endif %} group-body" id="group-{{ label|lower }}">
+    <div class="collapse{% if label == 'Active' or label == 'Active / No Schedule' or label == 'New' %} show{% endif %} group-body" id="group-{{ css_class }}">
         <div class="list-group">
             {% for account in accounts %}
             <div class="list-group-item p-0 account-item"
                  data-search="{{ account.nick|lower }} {{ account.phone|default:''|lower }} {{ account.device_name|default:''|lower }} {{ account.location.ip|default:''|lower }} {{ account.location.country|default:''|lower }} {{ account.security.api|default:''|lower }}">
 
                 <!-- Account header row -->
-                <div class="d-flex align-items-center justify-content-between px-3 py-2 {% if account.is_banned %}acc-banned{% elif account.is_inactive %}acc-inactive{% elif account.is_active and account.last_transaction.first_withdraw %}acc-verified{% elif account.is_active %}acc-active{% elif account.is_new %}acc-new{% endif %}">
+                <div class="d-flex align-items-center justify-content-between px-3 py-2 {% if account.is_banned %}acc-banned{% elif account.is_inactive %}acc-inactive{% elif account.is_active_no_schedule %}acc-active-no-schedule{% elif account.is_active and account.last_transaction.first_withdraw %}acc-verified{% elif account.is_active %}acc-active{% elif account.is_new %}acc-new{% endif %}">
                     <div class="d-flex align-items-center gap-1 flex-wrap">
                         <!-- Chevron toggle button -->
                         <button class="btn btn-link p-0 text-dark" type="button"
@@ -128,7 +129,7 @@
 
                 <!-- Collapsed detail panel -->
                 <div class="collapse" id="details-{{ account.pk }}">
-                    <div class="px-4 pb-3 pt-1 border-top {% if account.is_banned %}acc-banned{% elif account.is_inactive %}acc-inactive{% elif account.is_active and account.last_transaction.first_withdraw %}acc-verified{% elif account.is_active %}acc-active{% elif account.is_new %}acc-new{% endif %}" style="font-size:0.9rem;">
+                    <div class="px-4 pb-3 pt-1 border-top {% if account.is_banned %}acc-banned{% elif account.is_inactive %}acc-inactive{% elif account.is_active_no_schedule %}acc-active-no-schedule{% elif account.is_active and account.last_transaction.first_withdraw %}acc-verified{% elif account.is_active %}acc-active{% elif account.is_new %}acc-new{% endif %}" style="font-size:0.9rem;">
 
                         <div class="row">
                             <!-- Account -->

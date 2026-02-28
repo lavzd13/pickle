@@ -55,6 +55,7 @@ class AccountDetailForm(forms.ModelForm):
     ACCOUNT_STATUS_CHOICES = [
         ('is_new', 'New'),
         ('is_active', 'Active'),
+        ('is_active_no_schedule', 'Active / No Schedule'),
         ('is_inactive', 'Inactive'),
         ('is_banned', 'Banned'),
     ]
@@ -84,6 +85,8 @@ class AccountDetailForm(forms.ModelForm):
         if self.instance and self.instance.pk:
             if self.instance.is_active:
                 self.fields['account_status'].initial = 'is_active'
+            elif self.instance.is_active_no_schedule:
+                self.fields['account_status'].initial = 'is_active_no_schedule'
             elif self.instance.is_inactive:
                 self.fields['account_status'].initial = 'is_inactive'
             elif self.instance.is_banned:
@@ -96,6 +99,7 @@ class AccountDetailForm(forms.ModelForm):
         status = self.cleaned_data.get('account_status', 'is_new')
         instance.is_new = (status == 'is_new')
         instance.is_active = (status == 'is_active')
+        instance.is_active_no_schedule = (status == 'is_active_no_schedule')
         instance.is_inactive = (status == 'is_inactive')
         instance.is_banned = (status == 'is_banned')
         if commit:
