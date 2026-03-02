@@ -16,16 +16,10 @@
 <div class="card mb-3">
     <div class="card-body">
         <form method="get" class="row g-3">
-            <div class="col-md-3">
-                <label for="account" class="form-label">Filter by Account</label>
-                <select name="account" id="account" class="form-select">
-                    <option value="">All Accounts</option>
-                    {% for account in accounts %}
-                    <option value="{{ account.id }}" {% if selected_account == account.id|stringformat:"s" %}selected{% endif %}>
-                        {{ account }}
-                    </option>
-                    {% endfor %}
-                </select>
+            <div class="col-md-4 position-relative">
+                <label for="q" class="form-label">Search Account</label>
+                <input type="text" name="q" id="q" class="form-control" placeholder="Nickname or API key..." value="{{ q }}" autocomplete="off">
+                <div id="q-results" class="list-group position-absolute shadow" style="z-index:100; display:none; max-height:250px; overflow-y:auto; width:calc(100% - 24px);"></div>
             </div>
             <div class="col-md-3">
                 <label for="start_date" class="form-label">Start Date</label>
@@ -35,13 +29,11 @@
                 <label for="end_date" class="form-label">End Date</label>
                 <input type="date" name="end_date" id="end_date" class="form-control" value="{{ end_date }}">
             </div>
-            <div class="col-md-3 d-flex align-items-end">
-                <button type="submit" class="btn btn-primary me-2">
+            <div class="col-md-2 d-flex align-items-end gap-2">
+                <button type="submit" class="btn btn-primary flex-fill">
                     <i class="bi bi-funnel"></i> Filter
                 </button>
-                <a href="{% url 'session_list' %}" class="btn btn-secondary">
-                    <i class="bi bi-x-circle"></i> Clear
-                </a>
+                <a href="{% url 'session_list' %}" class="btn btn-secondary flex-fill">Clear</a>
             </div>
         </form>
     </div>
@@ -49,8 +41,12 @@
 
 <!-- Sessions Table -->
 <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Sessions</span>
+        <small class="text-muted">{{ page_obj.paginator.count }} record{{ page_obj.paginator.count|pluralize }}</small>
+    </div>
     <div class="card-body">
-        {% if daily_entries %}
+        {% if page_obj %}
         <div class="table-responsive">
             <table class="table table-hover">
                 <thead>
@@ -65,7 +61,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for entry in daily_entries %}
+                    {% for entry in page_obj %}
                     <tr>
                         <td>
                             <strong>{{ entry.account.nick }}</strong>
@@ -101,6 +97,30 @@
                 </tbody>
             </table>
         </div>
+
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <small class="text-muted">
+                Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }}
+            </small>
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                        <a class="page-link" href="?q={{ q }}&start_date={{ start_date }}&end_date={{ end_date }}&page={{ page_obj.previous_page_number }}">&laquo;</a>
+                    </li>
+                    {% for num in page_obj.paginator.page_range %}
+                    <li class="page-item {% if num == page_obj.number %}active{% endif %}">
+                        <a class="page-link" href="?q={{ q }}&start_date={{ start_date }}&end_date={{ end_date }}&page={{ num }}">{{ num }}</a>
+                    </li>
+                    {% endfor %}
+                    <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                        <a class="page-link" href="?q={{ q }}&start_date={{ start_date }}&end_date={{ end_date }}&page={{ page_obj.next_page_number }}">&raquo;</a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+
         {% else %}
         <div class="text-center py-5">
             <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
@@ -110,4 +130,48 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var qInput = document.getElementById('q');
+var qResults = document.getElementById('q-results');
+var qTimer = null;
+
+qInput.addEventListener('input', function () {
+    clearTimeout(qTimer);
+    var val = this.value.trim();
+    if (val.length < 1) { qResults.style.display = 'none'; return; }
+    qTimer = setTimeout(function () {
+        fetch('/account-search/?q=' + encodeURIComponent(val))
+            .then(r => r.json())
+            .then(function (data) {
+                qResults.innerHTML = '';
+                if (!data.results.length) {
+                    qResults.innerHTML = '<div class="list-group-item text-muted small">No accounts found</div>';
+                    qResults.style.display = '';
+                    return;
+                }
+                data.results.forEach(function (acc) {
+                    var item = document.createElement('a');
+                    item.href = '#';
+                    item.className = 'list-group-item list-group-item-action py-2 small';
+                    item.textContent = acc.nick + (acc.platform ? ' (' + acc.platform + ')' : '') + (acc.api ? '  —  ' + acc.api : '');
+                    item.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        qInput.value = acc.nick;
+                        qResults.style.display = 'none';
+                    });
+                    qResults.appendChild(item);
+                });
+                qResults.style.display = '';
+            });
+    }, 250);
+});
+
+document.addEventListener('click', function (e) {
+    if (!qInput.contains(e.target) && !qResults.contains(e.target))
+        qResults.style.display = 'none';
+});
+</script>
 {% endblock %}

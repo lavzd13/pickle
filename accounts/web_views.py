@@ -1,7 +1,9 @@
+import calendar
 from collections import defaultdict
 from datetime import timedelta
 import random
 
+from django.core.paginator import Paginator
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
@@ -161,32 +163,32 @@ def session_list(request):
         sessions = PlaySession.objects.all_including_old().select_related('account', 'created_by')
     else:
         sessions = PlaySession.objects.filter(created_by=request.user).select_related('account', 'created_by')
-    
-    # Filter by account if specified
-    account_id = request.GET.get('account')
-    if account_id:
-        sessions = sessions.filter(account_id=account_id)
-    
-    # Filter by date range
-    start_date = request.GET.get('start_date')
-    end_date = request.GET.get('end_date')
-    if start_date:
-        sessions = sessions.filter(session_date__gte=start_date)
-    if end_date:
-        sessions = sessions.filter(session_date__lte=end_date)
-    
-    # Get accounts for filter dropdown
-    if request.user.is_superuser:
-        accounts = AccountDetail.objects.all()
-    else:
-        accounts = AccountDetail.objects.filter(play_sessions__created_by=request.user).distinct()
-    
+
+    # Search by nickname or API key
+    q = request.GET.get('q', '').strip()
+    if q:
+        matching_ids = AccountDetail.objects.filter(
+            Q(nick__icontains=q) | Q(security__api__icontains=q)
+        ).values_list('id', flat=True)
+        sessions = sessions.filter(account_id__in=matching_ids)
+
+    # Default date range to current month
+    now = timezone.localdate()
+    default_start = now.replace(day=1).isoformat()
+    default_end = now.replace(day=calendar.monthrange(now.year, now.month)[1]).isoformat()
+
+    start_date = request.GET.get('start_date') or default_start
+    end_date = request.GET.get('end_date') or default_end
+    sessions = sessions.filter(session_date__gte=start_date, session_date__lte=end_date)
+
     daily_entries = _group_sessions_by_day(sessions)
 
+    paginator = Paginator(daily_entries, 25)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
     context = {
-        'daily_entries': daily_entries,
-        'accounts': accounts,
-        'selected_account': account_id,
+        'page_obj': page_obj,
+        'q': q,
         'start_date': start_date,
         'end_date': end_date,
     }
@@ -1312,8 +1314,15 @@ def dw_entry_update(request):
         entry.network_id = data.get('network_id') or None
         entry.wallet_name = data.get('wallet_name', entry.wallet_name)
         entry.wallet = data.get('wallet', entry.wallet)
-        entry.status = data.get('status', entry.status)
+        new_status = data.get('status', entry.status)
+        entry.status = new_status
         entry.save(update_fields=['amount', 'network_id', 'wallet_name', 'wallet', 'status'])
+        # Auto-set first_withdraw when completing a withdrawal
+        if new_status == 'completed':
+            lt, _ = LastTransaction.objects.get_or_create(account=entry.account)
+            if not lt.first_withdraw:
+                lt.first_withdraw = True
+                lt.save(update_fields=['first_withdraw'])
     else:
         return JsonResponse({'error': 'Invalid type'}, status=400)
 
@@ -1394,8 +1403,16 @@ def dw_entry_delete(request):
 @user_passes_test(is_superuser)
 def deposit_withdrawal_reports(request):
     """Combined D/W page — superuser only."""
+    now = timezone.localdate()
+    default_from = now.replace(day=1).isoformat()
+    last_day = calendar.monthrange(now.year, now.month)[1]
+    default_to = now.replace(day=last_day).isoformat()
     networks = Network.objects.all()
-    return render(request, 'accounts/deposit_withdrawal_reports.html', {'networks': networks})
+    return render(request, 'accounts/deposit_withdrawal_reports.html', {
+        'networks': networks,
+        'default_from': default_from,
+        'default_to': default_to,
+    })
 
 
 @login_required
@@ -1408,7 +1425,7 @@ def deposit_withdrawal_history(request):
     status = request.GET.get('status', '').strip()
 
     dep_qs = Deposit.objects.select_related('account', 'account__platform', 'network')
-    wd_qs = Withdrawal.objects.select_related('account', 'account__platform', 'network')
+    wd_qs = Withdrawal.objects.select_related('account', 'account__platform', 'network', 'account__last_transaction')
 
     if q:
         dep_qs = dep_qs.filter(Q(account__nick__icontains=q) | Q(account__security__api__icontains=q))
@@ -1446,6 +1463,10 @@ def deposit_withdrawal_history(request):
             'created_at': e.created_at.strftime('%Y-%m-%d %H:%M'),
         })
     for e in wd_qs:
+        try:
+            first_wd = e.account.last_transaction.first_withdraw
+        except LastTransaction.DoesNotExist:
+            first_wd = False
         entries.append({
             'id': e.id,
             'type': 'withdrawal',
@@ -1457,17 +1478,32 @@ def deposit_withdrawal_history(request):
             'wallet': e.wallet or '',
             'amount': str(e.amount),
             'status': e.status,
+            'first_withdraw': first_wd,
             'created_at': e.created_at.strftime('%Y-%m-%d %H:%M'),
         })
 
     entries.sort(key=lambda x: x['created_at'], reverse=True)
 
+    # Pagination
+    page_size = 25
+    page = int(request.GET.get('page', 1))
+    total_count = len(entries)
+    total_pages = max(1, (total_count + page_size - 1) // page_size)
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * page_size
+    page_entries = entries[start:start + page_size]
+
     return JsonResponse({
-        'entries': entries,
+        'entries': page_entries,
         'totals': {
             'deposits': str(total_deposits),
             'withdrawals': str(total_withdrawals),
-        }
+        },
+        'pagination': {
+            'page': page,
+            'total_pages': total_pages,
+            'total_count': total_count,
+        },
     })
 
 

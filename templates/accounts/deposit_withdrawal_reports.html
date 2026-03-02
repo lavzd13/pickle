@@ -74,11 +74,11 @@
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small text-muted mb-1">From</label>
-                    <input type="date" id="filter-from" class="form-control">
+                    <input type="date" id="filter-from" class="form-control" value="{{ default_from }}">
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small text-muted mb-1">To</label>
-                    <input type="date" id="filter-to" class="form-control">
+                    <input type="date" id="filter-to" class="form-control" value="{{ default_to }}">
                 </div>
                 <div class="col-md-1">
                     <label class="form-label small text-muted mb-1">Status</label>
@@ -128,6 +128,14 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+        <!-- Pagination -->
+        <div class="card-footer bg-transparent d-flex justify-content-between align-items-center py-2" id="pagination-footer" style="display:none!important;">
+            <small class="text-muted" id="pagination-info"></small>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-secondary" id="btn-prev" disabled>&laquo; Prev</button>
+                <button class="btn btn-sm btn-outline-secondary" id="btn-next" disabled>Next &raquo;</button>
             </div>
         </div>
     </div>
@@ -200,9 +208,14 @@ document.getElementById('btn-clear-account').addEventListener('click', function 
 });
 
 // ── Load history ────────────────────────────────────────────────────────────
+var currentPage = 1;
+
 function loadHistory(params) {
-    window._lastHistoryParams = params || {};
-    var qs = new URLSearchParams(params || {}).toString();
+    params = params || {};
+    if (!params.page) params.page = 1;
+    currentPage = parseInt(params.page);
+    window._lastHistoryParams = params;
+    var qs = new URLSearchParams(params).toString();
     document.getElementById('history-body').innerHTML =
         '<tr><td colspan="7" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2" role="status"></div>Loading...</td></tr>';
 
@@ -220,11 +233,13 @@ function loadHistory(params) {
             netEl.className = 'fs-4 fw-bold ' + (net >= 0 ? 'text-success' : 'text-danger');
 
             var tbody = document.getElementById('history-body');
-            var count = data.entries.length;
-            document.getElementById('entries-count').textContent = count + ' record' + (count !== 1 ? 's' : '');
+            var pg = data.pagination;
+            var total = pg.total_count;
+            document.getElementById('entries-count').textContent = total + ' record' + (total !== 1 ? 's' : '');
 
-            if (!count) {
+            if (!data.entries.length) {
                 tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No entries found</td></tr>';
+                document.getElementById('pagination-footer').style.display = 'none';
                 return;
             }
             tbody.innerHTML = '';
@@ -235,6 +250,12 @@ function loadHistory(params) {
                 var opBadge = isDeposit
                     ? '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Deposit</span>'
                     : '<span class="badge bg-success-subtle text-success border border-success-subtle">Withdrawal</span>';
+
+                // Warning badge for withdrawals where first_withdraw is not set
+                var firstWdBadge = '';
+                if (!isDeposit && !e.first_withdraw) {
+                    firstWdBadge = ' <span class="badge bg-warning text-dark" title="First withdrawal not recorded">No 1st WD</span>';
+                }
 
                 var amountHtml = isDeposit
                     ? '<span class="text-danger fw-semibold">-' + e.amount + '</span>'
@@ -247,19 +268,75 @@ function loadHistory(params) {
                 };
                 var statusBadge = statusMap[e.status] || e.status;
 
+                // Action buttons: View always, plus approve/cancel for pending
+                var actionHtml = '<a href="/deposit-withdrawal/entry/' + e.type + '/' + e.id + '/" class="btn btn-sm btn-outline-primary me-1">View</a>';
+                if (e.status === 'pending') {
+                    actionHtml +=
+                        '<button class="btn btn-sm btn-outline-success me-1 btn-dw-action" data-type="' + e.type + '" data-id="' + e.id + '" data-action="completed" title="Complete"><i class="bi bi-check-lg"></i></button>' +
+                        '<button class="btn btn-sm btn-outline-danger btn-dw-action" data-type="' + e.type + '" data-id="' + e.id + '" data-action="cancelled" title="Cancel"><i class="bi bi-x-lg"></i></button>';
+                }
+
                 tr.innerHTML =
                     '<td class="ps-3 text-nowrap text-muted small">' + e.created_at + '</td>' +
-                    '<td class="fw-semibold">' + e.account + '</td>' +
+                    '<td class="fw-semibold">' + e.account + firstWdBadge + '</td>' +
                     '<td class="text-muted small">' + (e.wallet_name || '—') + '</td>' +
                     '<td>' + opBadge + '</td>' +
                     '<td class="text-end pe-4">' + amountHtml + '</td>' +
                     '<td class="ps-4">' + statusBadge + '</td>' +
-                    '<td class="pe-3 text-end"><a href="/deposit-withdrawal/entry/' + e.type + '/' + e.id + '/" class="btn btn-sm btn-outline-primary">View</a></td>';
+                    '<td class="pe-3 text-end text-nowrap">' + actionHtml + '</td>';
                 tbody.appendChild(tr);
             });
 
+            // Pagination controls
+            var footer = document.getElementById('pagination-footer');
+            if (pg.total_pages > 1) {
+                footer.style.display = '';
+                var start = (pg.page - 1) * 25 + 1;
+                var end = Math.min(pg.page * 25, pg.total_count);
+                document.getElementById('pagination-info').textContent = 'Showing ' + start + '–' + end + ' of ' + pg.total_count;
+                document.getElementById('btn-prev').disabled = (pg.page <= 1);
+                document.getElementById('btn-next').disabled = (pg.page >= pg.total_pages);
+            } else {
+                footer.style.display = 'none';
+            }
         });
 }
+
+// ── Pagination buttons ──────────────────────────────────────────────────────
+document.getElementById('btn-prev').addEventListener('click', function () {
+    if (currentPage > 1) {
+        var params = Object.assign({}, window._lastHistoryParams);
+        params.page = currentPage - 1;
+        loadHistory(params);
+    }
+});
+document.getElementById('btn-next').addEventListener('click', function () {
+    var params = Object.assign({}, window._lastHistoryParams);
+    params.page = currentPage + 1;
+    loadHistory(params);
+});
+
+// ── Quick approve / cancel ──────────────────────────────────────────────────
+document.getElementById('history-body').addEventListener('click', function (ev) {
+    var btn = ev.target.closest('.btn-dw-action');
+    if (!btn) return;
+    var tr = btn.closest('tr');
+    var newStatus = btn.dataset.action;
+    btn.disabled = true;
+    fetch('/dw-entry/update/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCsrf()},
+        body: JSON.stringify({type: btn.dataset.type, id: +btn.dataset.id, status: newStatus})
+    }).then(function (r) { return r.json(); }).then(function (data) {
+        if (!data.ok) { btn.disabled = false; return; }
+        var statusMap = {
+            completed: '<span class="badge bg-success-subtle text-success border border-success-subtle">Completed</span>',
+            cancelled: '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Cancelled</span>',
+        };
+        tr.cells[5].innerHTML = statusMap[newStatus] || newStatus;
+        tr.cells[6].innerHTML = '<a href="/deposit-withdrawal/entry/' + btn.dataset.type + '/' + btn.dataset.id + '/" class="btn btn-sm btn-outline-primary me-1">View</a>';
+    });
+});
 
 // ── Filter / Clear buttons ──────────────────────────────────────────────────
 document.getElementById('btn-filter').addEventListener('click', function () {
@@ -272,6 +349,7 @@ document.getElementById('btn-filter').addEventListener('click', function () {
     if (from) params.date_from = from;
     if (to) params.date_to = to;
     if (status) params.status = status;
+    params.page = 1;
     loadHistory(params);
 });
 
@@ -288,6 +366,6 @@ document.getElementById('btn-clear').addEventListener('click', function () {
 });
 
 // ── Load on page ready ───────────────────────────────────────────────────────
-loadHistory();
+loadHistory({ date_from: '{{ default_from }}', date_to: '{{ default_to }}' });
 </script>
 {% endblock %}
