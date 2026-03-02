@@ -105,17 +105,21 @@
             </small>
             <nav>
                 <ul class="pagination pagination-sm mb-0">
-                    <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
                         <a class="page-link" href="?q={{ q }}&start_date={{ start_date }}&end_date={{ end_date }}&page={{ page_obj.previous_page_number }}">&laquo;</a>
                     </li>
+                    {% endif %}
                     {% for num in page_obj.paginator.page_range %}
                     <li class="page-item {% if num == page_obj.number %}active{% endif %}">
                         <a class="page-link" href="?q={{ q }}&start_date={{ start_date }}&end_date={{ end_date }}&page={{ num }}">{{ num }}</a>
                     </li>
                     {% endfor %}
-                    <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
                         <a class="page-link" href="?q={{ q }}&start_date={{ start_date }}&end_date={{ end_date }}&page={{ page_obj.next_page_number }}">&raquo;</a>
                     </li>
+                    {% endif %}
                 </ul>
             </nav>
         </div>
