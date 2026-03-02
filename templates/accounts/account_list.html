@@ -193,7 +193,14 @@
                                     {% if account.location.ip %}<button class="btn btn-link p-0 ms-1 copy-btn" onclick="copyText(event, '{{ account.location.ip|escapejs }}')" title="Copy"><i class="bi bi-clipboard"></i></button>{% endif %}
                                 </div>
                                 <div><span class="text-muted">Proxy/VPN:</span> {{ account.location.proxy_vpn|default:"-" }}</div>
-                                <div><span class="text-muted">Lat/Lng:</span> {{ account.location.latitude|default:"-" }} / {{ account.location.longtitude|default:"-" }}</div>
+								<div>
+                                    <span class="text-muted">Latitude:</span> {{ account.location.latitude|default:"-" }}
+                                    {% if account.location.latitude %}<button class="btn btn-link p-0 ms-1 copy-btn" onclick="copyText(event, '{{ account.location.latitude|escapejs }}')" title="Copy"><i class="bi bi-clipboard"></i></button>{% endif %}
+                                </div>
+								<div>
+                                    <span class="text-muted">Longtitude:</span> {{ account.location.longtitude|default:"-" }}
+                                    {% if account.location.longtitude %}<button class="btn btn-link p-0 ms-1 copy-btn" onclick="copyText(event, '{{ account.location.longtitude|escapejs }}')" title="Copy"><i class="bi bi-clipboard"></i></button>{% endif %}
+                                </div>
                                 {% else %}
                                 <div class="text-muted">Not set</div>
                                 {% endif %}
