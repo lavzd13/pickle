@@ -14,6 +14,7 @@ from .models import PlaySession, AccountDetail, Payment, Location, Security, Las
 from django.db.models import Sum
 from django.forms import modelformset_factory
 from django.http import JsonResponse, HttpResponse, Http404
+from django.views.decorators.csrf import csrf_exempt
 from .forms import PlaySessionForm, DaySessionForm, AccountDetailForm, PaymentForm, UserCreateForm, UserEditForm, LocationForm, SecurityForm, LastTransactionForm
 
 
@@ -951,6 +952,7 @@ def create_device_command(request):
     return JsonResponse({'ok': True})
 
 
+@csrf_exempt
 @login_required
 def pending_device_commands(request):
     """Return all pending DeviceCommands for run.py polling.
@@ -961,6 +963,7 @@ def pending_device_commands(request):
     return JsonResponse({'commands': commands})
 
 
+@csrf_exempt
 @login_required
 def update_device_commands(request):
     """Bulk-update DeviceCommand statuses from run.py."""
