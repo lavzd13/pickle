@@ -55,9 +55,15 @@
                 <p class="text-muted mb-1">Duration: <strong class="card-duration"></strong> min</p>
                 <p class="text-muted mb-2" style="font-size:0.85rem;">Remaining today: <strong class="card-remaining"></strong> min</p>
                 <p class="text-danger mb-2" style="font-size:0.8rem;"><i class="bi bi-clock"></i> Expires in <span class="card-pending-expire-time">20:00</span></p>
-                <button class="btn btn-success card-start-btn" style="font-size:1.1rem; padding: 0.5rem 1.5rem;">
-                    <i class="bi bi-play-fill"></i> Start Session
-                </button>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <button class="btn btn-success card-start-btn" style="font-size:1.1rem; padding: 0.5rem 1.5rem;">
+                        <i class="bi bi-play-fill"></i> Start Session
+                    </button>
+                    <button class="btn btn-outline-secondary card-start-device-btn" style="font-size:0.95rem; padding: 0.4rem 1rem;">
+                        <i class="bi bi-phone"></i> Start Device
+                    </button>
+                </div>
+                <div class="card-device-status mt-2" style="display:none;"></div>
             </div>
             <div class="card-running-section" style="display:none;">
                 <div class="d-flex align-items-center gap-3 mb-2">
@@ -264,6 +270,29 @@
         card.querySelector('.card-remaining').textContent = remainingMinutes;
 
         startPendingCountdown(card, expiresAtMs || (Date.now() + 20 * 60 * 1000), sessionId);
+
+        // Start Device button
+        card.querySelector('.card-start-device-btn').addEventListener('click', function () {
+            var btn = this;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Starting...';
+            fetch('/play/start-device/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                body: JSON.stringify({ session_id: sessionId }),
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.error) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-phone"></i> Start Device';
+                    var statusEl = card.querySelector('.card-device-status');
+                    statusEl.innerHTML = '<small class="text-danger">' + data.error + '</small>';
+                    statusEl.style.display = 'block';
+                }
+            })
+            .catch(function () { btn.disabled = false; btn.innerHTML = '<i class="bi bi-phone"></i> Start Device'; });
+        });
 
         // Quit button
         card.querySelector('.card-quit-btn').addEventListener('click', function () {
@@ -763,6 +792,26 @@
                     if (!cardBySessionId[p.session_id]) {
                         addSessionCard(p.account, p.duration_minutes, p.remaining_minutes, Date.now() + p.expires_in_seconds * 1000, p.session_id);
                         sortSessionCards();
+                    }
+                    var pCard = cardBySessionId[p.session_id];
+                    if (pCard && p.device_status) {
+                        var dsEl = pCard.querySelector('.card-device-status');
+                        var dbtn = pCard.querySelector('.card-start-device-btn');
+                        if (p.device_status === 'pending') {
+                            dbtn.disabled = true;
+                            dbtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Starting...';
+                            dsEl.innerHTML = '<small class="text-muted"><i class="bi bi-hourglass-split"></i> Starting device...</small>';
+                            dsEl.style.display = 'block';
+                        } else if (p.device_status === 'completed') {
+                            dbtn.style.display = 'none';
+                            dsEl.innerHTML = '<small class="text-success"><i class="bi bi-check-circle-fill"></i> Device ready</small>';
+                            dsEl.style.display = 'block';
+                        } else if (p.device_status === 'failed') {
+                            dbtn.disabled = false;
+                            dbtn.innerHTML = '<i class="bi bi-phone"></i> Retry';
+                            dsEl.innerHTML = '<small class="text-danger"><i class="bi bi-x-circle-fill"></i> ' + (p.device_error || 'Device failed to start') + '</small>';
+                            dsEl.style.display = 'block';
+                        }
                     }
                 });
 
