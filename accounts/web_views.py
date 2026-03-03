@@ -10,7 +10,7 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.utils import timezone
-from .models import PlaySession, AccountDetail, Payment, Location, Security, LastTransaction, PlayInfo, Deposit, Withdrawal, Network, Platform, ProxyVpn, WalletProvider, DepositOrder, WithdrawalOrder, CountryBlackList, SMSPlatform
+from .models import PlaySession, AccountDetail, Payment, Location, Security, LastTransaction, PlayInfo, Deposit, Withdrawal, Network, Platform, ProxyVpn, WalletProvider, DepositOrder, WithdrawalOrder, CountryBlackList, SMSPlatform, DeviceCommand
 from django.db.models import Sum
 from django.forms import modelformset_factory
 from django.http import JsonResponse, HttpResponse, Http404
@@ -160,9 +160,9 @@ def dashboard(request):
 def session_list(request):
     """List all sessions accessible to the user"""
     if request.user.is_superuser:
-        sessions = PlaySession.objects.all_including_old().select_related('account', 'created_by')
+        sessions = PlaySession.objects.all_including_old().filter(is_pending=False).select_related('account', 'created_by')
     else:
-        sessions = PlaySession.objects.filter(created_by=request.user).select_related('account', 'created_by')
+        sessions = PlaySession.objects.filter(created_by=request.user, is_pending=False).select_related('account', 'created_by')
 
     # Search by nickname or API key
     q = request.GET.get('q', '').strip()
@@ -898,11 +898,15 @@ def active_sessions(request):
         except (ValueError, TypeError):
             duration_minutes, remaining_minutes = 60, 0
         acc = s.account
+        # Latest device command status
+        dc = s.device_commands.order_by('-created_at').first()
         pending_result.append({
             'session_id': s.id,
             'expires_in_seconds': expires_in,
             'duration_minutes': duration_minutes,
             'remaining_minutes': remaining_minutes,
+            'device_status': dc.status if dc else None,
+            'device_error': dc.error_message if dc else '',
             'account': {
                 'id': acc.id,
                 'nick': acc.nick,
@@ -928,6 +932,44 @@ def cancel_pending_session(request):
     session_id = data.get('session_id')
 
     PlaySession.objects.filter(pk=session_id, is_pending=True, created_by=request.user).delete()
+    return JsonResponse({'ok': True})
+
+
+@login_required
+def create_device_command(request):
+    """Create a DeviceCommand for a pending session so run.py can start the device."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    import json
+    data = json.loads(request.body)
+    session_id = data.get('session_id')
+    session = get_object_or_404(PlaySession, pk=session_id, is_pending=True, created_by=request.user)
+    device_name = session.account.device_name
+    if not device_name:
+        return JsonResponse({'error': 'Account has no device name set'}, status=400)
+    DeviceCommand.objects.create(session=session, device_name=device_name)
+    return JsonResponse({'ok': True})
+
+
+@login_required
+def pending_device_commands(request):
+    """Return all pending DeviceCommands for run.py polling."""
+    commands = DeviceCommand.objects.filter(status='pending').values('id', 'device_name')
+    return JsonResponse({'commands': list(commands)})
+
+
+@login_required
+def update_device_commands(request):
+    """Bulk-update DeviceCommand statuses from run.py."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    import json
+    data = json.loads(request.body)
+    for cmd in data.get('commands', []):
+        DeviceCommand.objects.filter(pk=cmd['id']).update(
+            status=cmd.get('status', 'completed'),
+            error_message=cmd.get('error_message', ''),
+        )
     return JsonResponse({'ok': True})
 
 

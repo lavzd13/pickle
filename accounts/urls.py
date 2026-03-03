@@ -41,6 +41,9 @@ urlpatterns = [
     path('play/stop-session/', web_views.stop_session, name='stop_session'),
     path('play/cancel-pending/', web_views.cancel_pending_session, name='cancel_pending_session'),
     path('play/dismiss-session/', web_views.dismiss_session, name='dismiss_session'),
+    path('play/start-device/', web_views.create_device_command, name='create_device_command'),
+    path('play/device-commands/pending/', web_views.pending_device_commands, name='pending_device_commands'),
+    path('play/device-commands/update/', web_views.update_device_commands, name='update_device_commands'),
 
     # Deposit/Withdrawals
     path('deposit-withdrawal/', web_views.deposit_withdrawal, name='deposit_withdrawal'),

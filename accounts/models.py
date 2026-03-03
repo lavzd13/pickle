@@ -364,6 +364,27 @@ class SMSPlatform(models.Model):
         return f"{self.name}"
 
 
+class DeviceCommand(models.Model):
+    """Command to start a device, polled by the local run.py client."""
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+    session = models.ForeignKey(PlaySession, on_delete=models.CASCADE, related_name='device_commands')
+    device_name = models.CharField(max_length=100)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    error_message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'device_command'
+
+    def __str__(self):
+        return f"DeviceCommand {self.device_name} ({self.status})"
+
+
 class CountryBlackList(models.Model):
     """Countries which are on blacklist because of SMS not arriving on grizzly"""
     country = models.CharField(blank=True)
