@@ -797,7 +797,7 @@
                     if (pCard && p.device_status) {
                         var dsEl = pCard.querySelector('.card-device-status');
                         var dbtn = pCard.querySelector('.card-start-device-btn');
-                        if (p.device_status === 'pending') {
+                        if (p.device_status === 'pending' || p.device_status === 'in_progress') {
                             dbtn.disabled = true;
                             dbtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Starting...';
                             dsEl.innerHTML = '<small class="text-muted"><i class="bi bi-hourglass-split"></i> Starting device...</small>';
