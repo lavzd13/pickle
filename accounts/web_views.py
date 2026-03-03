@@ -953,9 +953,12 @@ def create_device_command(request):
 
 @login_required
 def pending_device_commands(request):
-    """Return all pending DeviceCommands for run.py polling."""
-    commands = DeviceCommand.objects.filter(status='pending').values('id', 'device_name')
-    return JsonResponse({'commands': list(commands)})
+    """Return all pending DeviceCommands for run.py polling.
+    Atomically marks them as in_progress so they won't be fetched again."""
+    commands = list(DeviceCommand.objects.filter(status='pending').values('id', 'device_name'))
+    if commands:
+        DeviceCommand.objects.filter(id__in=[c['id'] for c in commands]).update(status='in_progress')
+    return JsonResponse({'commands': commands})
 
 
 @login_required
