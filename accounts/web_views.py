@@ -644,6 +644,8 @@ def _get_eligible_accounts_for_sidebar():
             app_id = acc.security.app_id or ''
         except Exception:
             pass
+        if remaining < 20:
+            continue
         eligible.append({
             'nick': acc.nick,
             'platform': str(acc.platform) if acc.platform else '',
