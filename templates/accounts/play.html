@@ -3,7 +3,9 @@
 {% block title %}Play{% endblock %}
 
 {% block content %}
-<div class="container py-4" style="max-width: 560px;">
+<div class="container-fluid py-4">
+<div class="row justify-content-center">
+    <div class="col-12 {% if user.is_superuser %}col-lg-7{% endif %}" style="max-width: 560px;">
 
     <!-- Top action button -->
     <div class="text-center mb-4">
@@ -21,35 +23,32 @@
     <!-- Active session cards injected here -->
     <div id="session-list"></div>
 
-</div>
+    </div>
 
-{% if user.is_superuser %}
-<!-- Eligible accounts sidebar (pinned to the right) -->
-<div style="position: fixed; top: 70px; right: 15px; width: 250px; z-index: 1000;">
-    <div class="card shadow-sm">
-        <div class="card-header fw-bold py-2" style="font-size: 0.9rem;">Today's Accounts</div>
-        <div class="card-body p-0">
-            <div id="eligible-list" class="list-group list-group-flush" style="max-height: 75vh; overflow-y: auto;">
-                {% for a in eligible_accounts %}
-                <div class="list-group-item d-flex justify-content-between align-items-center py-1 px-2 eligible-item" data-nick="{{ a.nick }}"{% if a.in_session %} style="background-color: #d1f5d3;"{% endif %}>
-                    <span style="font-size:0.8rem;">
-                        {{ a.nick }}
-                        {% if a.platform %}<small class="text-muted">- {{ a.platform }}{% if a.app_id %} ({{ a.app_id }}){% endif %}</small>{% endif %}
-                    </span>
-                    {% if a.remaining <= 0 %}
-                        <span class="badge bg-secondary" style="font-size:0.7rem;">Done</span>
-                    {% else %}
+    {% if user.is_superuser %}
+    <div class="col-12 col-lg-3">
+        <div class="card shadow-sm">
+            <div class="card-header fw-bold py-2" style="font-size: 0.9rem;">Eligible Accounts</div>
+            <div class="card-body p-0">
+                <div id="eligible-list" class="list-group list-group-flush" style="max-height: 75vh; overflow-y: auto;">
+                    {% for a in eligible_accounts %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center py-1 px-2 eligible-item" data-nick="{{ a.nick }}"{% if a.in_session %} style="background-color: #d1f5d3;"{% endif %}>
+                        <span style="font-size:0.8rem;">
+                            {{ a.nick }}
+                            {% if a.platform %}<small class="text-muted">- {{ a.platform }}{% if a.app_id %} ({{ a.app_id }}){% endif %}</small>{% endif %}
+                        </span>
                         <span class="badge bg-primary" style="font-size:0.7rem;">{{ a.remaining }}m</span>
-                    {% endif %}
+                    </div>
+                    {% empty %}
+                    <div class="text-center text-muted py-3"><small>No accounts scheduled today</small></div>
+                    {% endfor %}
                 </div>
-                {% empty %}
-                <div class="text-center text-muted py-3"><small>No accounts scheduled today</small></div>
-                {% endfor %}
             </div>
         </div>
     </div>
+    {% endif %}
 </div>
-{% endif %}
+</div>
 
 <!-- Session card template (hidden) -->
 <template id="session-card-tpl">
@@ -853,16 +852,20 @@
                 });
 
                 // ── Update eligible sidebar ──
+                var eligibleNicks = new Set();
                 (data.eligible || []).forEach(function (a) {
+                    eligibleNicks.add(a.nick);
                     var el = document.querySelector('.eligible-item[data-nick="' + a.nick + '"]');
                     if (!el) return;
                     el.style.backgroundColor = a.in_session ? '#d1f5d3' : '';
                     var badge = el.querySelector('.badge');
                     if (badge) {
-                        badge.textContent = a.remaining <= 0 ? 'Done' : a.remaining + 'm';
-                        badge.className = a.remaining <= 0 ? 'badge bg-secondary' : 'badge bg-primary';
+                        badge.textContent = a.remaining + 'm';
                         badge.style.fontSize = '0.7rem';
                     }
+                });
+                document.querySelectorAll('.eligible-item').forEach(function (el) {
+                    if (!eligibleNicks.has(el.dataset.nick)) el.remove();
                 });
             })
             .catch(function (e) { console.error('session-poll error:', e); });
