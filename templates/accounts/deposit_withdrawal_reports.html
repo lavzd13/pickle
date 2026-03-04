@@ -84,7 +84,7 @@
                     <label class="form-label small text-muted mb-1">Status</label>
                     <select id="filter-status" class="form-select">
                         <option value="">All</option>
-                        <option value="active">Pending & Completed</option>
+                        <option value="active" selected>Pending & Completed</option>
                         <option value="pending">Pending</option>
                         <option value="completed">Completed</option>
                         <option value="cancelled">Cancelled</option>
@@ -366,6 +366,6 @@ document.getElementById('btn-clear').addEventListener('click', function () {
 });
 
 // ── Load on page ready ───────────────────────────────────────────────────────
-loadHistory({ date_from: '{{ default_from }}', date_to: '{{ default_to }}' });
+loadHistory({ date_from: '{{ default_from }}', date_to: '{{ default_to }}', status: document.getElementById('filter-status').value });
 </script>
 {% endblock %}

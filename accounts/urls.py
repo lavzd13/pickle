@@ -33,7 +33,7 @@ urlpatterns = [
     # Play
     path('play/', web_views.play, name='play'),
     path('play/eligible-account/', web_views.eligible_account, name='eligible_account'),
-    path('play/start-session/', web_views.start_session_play, name='start_session_play'),
+path('play/start-session/', web_views.start_session_play, name='start_session_play'),
     path('play/finish-session/', web_views.finish_session_play, name='finish_session_play'),
     path('play/active-sessions/', web_views.active_sessions, name='active_sessions'),
     path('play/pause-session/', web_views.pause_session_play, name='pause_session_play'),
