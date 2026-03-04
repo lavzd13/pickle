@@ -23,6 +23,34 @@
 
 </div>
 
+{% if user.is_superuser %}
+<!-- Eligible accounts sidebar (pinned to the right) -->
+<div style="position: fixed; top: 70px; right: 15px; width: 250px; z-index: 1000;">
+    <div class="card shadow-sm">
+        <div class="card-header fw-bold py-2" style="font-size: 0.9rem;">Today's Accounts</div>
+        <div class="card-body p-0">
+            <div id="eligible-list" class="list-group list-group-flush" style="max-height: 75vh; overflow-y: auto;">
+                {% for a in eligible_accounts %}
+                <div class="list-group-item d-flex justify-content-between align-items-center py-1 px-2 eligible-item" data-nick="{{ a.nick }}"{% if a.in_session %} style="background-color: #d1f5d3;"{% endif %}>
+                    <span style="font-size:0.8rem;">
+                        {{ a.nick }}
+                        {% if a.platform %}<small class="text-muted">- {{ a.platform }}{% if a.app_id %} ({{ a.app_id }}){% endif %}</small>{% endif %}
+                    </span>
+                    {% if a.remaining <= 0 %}
+                        <span class="badge bg-secondary" style="font-size:0.7rem;">Done</span>
+                    {% else %}
+                        <span class="badge bg-primary" style="font-size:0.7rem;">{{ a.remaining }}m</span>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <div class="text-center text-muted py-3"><small>No accounts scheduled today</small></div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Session card template (hidden) -->
 <template id="session-card-tpl">
     <div class="card shadow mb-3 session-card">
@@ -46,7 +74,7 @@
             </div>
             <div class="mb-2" style="font-size:0.9rem;">
                 <div><span class="text-muted">Device name:</span> <span class="card-device-name"></span></div>
-                <div><span class="text-muted">Platform:</span> <span class="card-platform"></span></div>
+                <div><span class="text-muted">Platform:</span> <span class="card-platform"></span> <span class="card-app-id text-muted"></span></div>
                 <div><span class="text-muted">Phone:</span> <span class="card-phone"></span></div>
                 <div><span class="text-muted">Withdraw Pass:</span> <span class="card-withdraw-pass"></span></div>
                 <div><span class="text-muted">Minimum Balance for Withdrawal:</span> $<span class="card-min-balance"></span></div>
@@ -197,6 +225,7 @@
         card.querySelector('.card-nick').textContent = account.nick;
         card.querySelector('.card-device-name').textContent = account.device_name || '-';
         card.querySelector('.card-platform').textContent = account.platform || '-';
+        card.querySelector('.card-app-id').textContent = account.app_id ? '(' + account.app_id + ')' : '';
         card.querySelector('.card-phone').textContent = account.phone || '-';
         card.querySelector('.card-withdraw-pass').textContent = account.withdraw_pass || '-';
         card.querySelector('.card-min-balance').textContent = account.min_balance || '0.00';
@@ -821,6 +850,19 @@
                     var card = cardBySessionId[sid];
                     if (!card || !card.parentNode) { delete cardBySessionId[sid]; return; }
                     removeCard(card, parseInt(sid));
+                });
+
+                // ── Update eligible sidebar ──
+                (data.eligible || []).forEach(function (a) {
+                    var el = document.querySelector('.eligible-item[data-nick="' + a.nick + '"]');
+                    if (!el) return;
+                    el.style.backgroundColor = a.in_session ? '#d1f5d3' : '';
+                    var badge = el.querySelector('.badge');
+                    if (badge) {
+                        badge.textContent = a.remaining <= 0 ? 'Done' : a.remaining + 'm';
+                        badge.className = a.remaining <= 0 ? 'badge bg-secondary' : 'badge bg-primary';
+                        badge.style.fontSize = '0.7rem';
+                    }
                 });
             })
             .catch(function (e) { console.error('session-poll error:', e); });

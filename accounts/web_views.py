@@ -580,10 +580,86 @@ def user_delete(request, pk):
         'sessions_count': sessions_count
     })
 
+def _get_eligible_accounts_for_sidebar():
+    """Compute today's eligible accounts with remaining minutes for the sidebar."""
+    from datetime import datetime as _dt
+    today = timezone.localdate()
+    day_name = today.strftime('%A')
+
+    all_accounts = list(
+        AccountDetail.objects.select_related('play_info', 'platform', 'security')
+        .filter(is_active=True)
+    )
+
+    today_sessions = PlaySession.objects.filter(
+        session_date=today, is_pending=False, is_active=False
+    )
+    played_minutes = {}
+    for s in today_sessions:
+        start_dt = _dt.combine(today, s.start_time)
+        end_dt = _dt.combine(today, s.end_time)
+        if end_dt < start_dt:
+            end_dt += timedelta(days=1)
+        mins = (end_dt - start_dt).total_seconds() / 60
+        played_minutes[s.account_id] = played_minutes.get(s.account_id, 0) + mins
+
+    now_naive = timezone.localtime().replace(tzinfo=None)
+    active_qs = PlaySession.objects.filter(
+        session_date=today, is_active=True, is_pending=False, is_done=False
+    )
+    active_ids = set()
+    for s in active_qs:
+        active_ids.add(s.account_id)
+        start_dt = _dt.combine(today, s.start_time)
+        if s.paused and s.pause_time:
+            elapsed_end = timezone.localtime(s.pause_time).replace(tzinfo=None)
+        else:
+            elapsed_end = now_naive
+        mins = (elapsed_end - start_dt).total_seconds() / 60
+        played_minutes[s.account_id] = played_minutes.get(s.account_id, 0) + mins
+
+    active_ids |= set(
+        PlaySession.objects.filter(
+            session_date=today, is_active=True, is_pending=True
+        ).values_list('account_id', flat=True)
+    )
+    active_ids |= set(
+        PlaySession.objects.filter(
+            session_date=today, is_active=True, is_done=True
+        ).values_list('account_id', flat=True)
+    )
+
+    eligible = []
+    for acc in all_accounts:
+        try:
+            hours = acc.play_info.schedule_of_the_week.get(day_name, -1)
+        except Exception:
+            continue
+        if not hours or hours <= 0:
+            continue
+        schedule_minutes = hours * 60
+        remaining = round(schedule_minutes - played_minutes.get(acc.id, 0))
+        app_id = ''
+        try:
+            app_id = acc.security.app_id or ''
+        except Exception:
+            pass
+        eligible.append({
+            'nick': acc.nick,
+            'platform': str(acc.platform) if acc.platform else '',
+            'app_id': app_id,
+            'remaining': remaining,
+            'in_session': acc.id in active_ids,
+        })
+    eligible.sort(key=lambda x: x['nick'].lower())
+    return eligible
+
+
 @login_required
 def play(request):
     """Play page."""
-    return render(request, 'accounts/play.html')
+    eligible = _get_eligible_accounts_for_sidebar() if request.user.is_superuser else []
+    return render(request, 'accounts/play.html', {'eligible_accounts': eligible})
 
 @login_required
 def get_random_accounts(request):
@@ -618,7 +694,7 @@ def eligible_account(request):
     day_name = today.strftime('%A')
     now_local = timezone.localtime()
 
-    all_accounts = list(AccountDetail.objects.select_related('play_info', 'payment').all())
+    all_accounts = list(AccountDetail.objects.select_related('play_info', 'payment', 'security').all())
 
     # Auto-expire only pending sessions whose 20-min lock has passed
     # (playing/done sessions are only deactivated by explicit user action)
@@ -712,6 +788,7 @@ def eligible_account(request):
         'nick': acc.nick,
         'device_name': acc.device_name,
         'platform': str(acc.platform) if acc.platform else '',
+        'app_id': getattr(acc, 'security', None) and acc.security.app_id or '',
         'phone': acc.phone or '',
         'withdraw_pass': acc.payment.withdraw_pass if hasattr(acc, 'payment') else '',
         'min_balance': str(acc.payment.min_balance) if hasattr(acc, 'payment') else '0.00',
@@ -785,28 +862,28 @@ def active_sessions(request):
     if request.user.is_superuser:
         playing_qs = PlaySession.objects.filter(
             session_date=today, is_active=True, is_pending=False, is_done=False
-        ).select_related('account', 'account__payment', 'created_by')
+        ).select_related('account', 'account__payment', 'account__security', 'created_by')
     else:
         playing_qs = PlaySession.objects.filter(
             session_date=today, is_active=True, is_pending=False, is_done=False,
             created_by=request.user
-        ).select_related('account', 'account__payment')
+        ).select_related('account', 'account__payment', 'account__security')
 
     # Pending: always the current user's own sessions
     pending_qs = PlaySession.objects.filter(
         session_date=today, is_active=True, is_pending=True, created_by=request.user
-    ).select_related('account', 'account__payment')
+    ).select_related('account', 'account__payment', 'account__security')
 
     # Done: superusers see all done sessions; others see own only
     if request.user.is_superuser:
         done_qs = PlaySession.objects.filter(
             session_date=today, is_active=True, is_pending=False, is_done=True
-        ).select_related('account', 'account__payment', 'created_by')
+        ).select_related('account', 'account__payment', 'account__security', 'created_by')
     else:
         done_qs = PlaySession.objects.filter(
             session_date=today, is_active=True, is_pending=False, is_done=True,
             created_by=request.user
-        ).select_related('account', 'account__payment')
+        ).select_related('account', 'account__payment', 'account__security')
 
     result = []
     for s in playing_qs:
@@ -843,6 +920,7 @@ def active_sessions(request):
                 'nick': acc.nick,
                 'device_name': acc.device_name,
                 'platform': str(acc.platform) if acc.platform else '',
+                'app_id': getattr(acc, 'security', None) and acc.security.app_id or '',
                 'phone': acc.phone or '',
                 'withdraw_pass': acc.payment.withdraw_pass if hasattr(acc, 'payment') else '',
                 'min_balance': str(acc.payment.min_balance) if hasattr(acc, 'payment') else '0.00',
@@ -878,6 +956,7 @@ def active_sessions(request):
                 'nick': acc.nick,
                 'device_name': acc.device_name,
                 'platform': str(acc.platform) if acc.platform else '',
+                'app_id': getattr(acc, 'security', None) and acc.security.app_id or '',
                 'phone': acc.phone or '',
                 'withdraw_pass': acc.payment.withdraw_pass if hasattr(acc, 'payment') else '',
                 'min_balance': str(acc.payment.min_balance) if hasattr(acc, 'payment') else '0.00',
@@ -913,13 +992,17 @@ def active_sessions(request):
                 'nick': acc.nick,
                 'device_name': acc.device_name,
                 'platform': str(acc.platform) if acc.platform else '',
+                'app_id': getattr(acc, 'security', None) and acc.security.app_id or '',
                 'phone': acc.phone or '',
                 'withdraw_pass': acc.payment.withdraw_pass if hasattr(acc, 'payment') else '',
                 'min_balance': str(acc.payment.min_balance) if hasattr(acc, 'payment') else '0.00',
             },
         })
 
-    return JsonResponse({'sessions': result, 'done': done_result, 'pending': pending_result})
+    # Eligible accounts sidebar data (superuser only)
+    eligible = _get_eligible_accounts_for_sidebar() if request.user.is_superuser else []
+
+    return JsonResponse({'sessions': result, 'done': done_result, 'pending': pending_result, 'eligible': eligible})
 
 
 @login_required
