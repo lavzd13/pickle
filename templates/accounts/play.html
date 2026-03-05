@@ -768,6 +768,9 @@
                         updateEndTimeDisplay(card, s.seconds_left);
                         card.dataset.sortPriority = '4';
                         card.dataset.endMs = String(Date.now() + s.seconds_left * 1000);
+                        if (s.remaining_after !== undefined && s.remaining_after !== null && s.remaining_after < 20) {
+                            markLastSession(card);
+                        }
                         setupPauseResume(card, s.session_id, s.account.id);
                         sortSessionCards();
                         return;
@@ -782,6 +785,11 @@
                     // Sync seconds_left from server (authoritative)
                     card._secondsLeft = s.seconds_left;
                     updateEndTimeDisplay(card, s.seconds_left);
+
+                    // Mark last session if remaining_after < 20
+                    if (s.remaining_after !== undefined && s.remaining_after !== null && s.remaining_after < 20) {
+                        markLastSession(card);
+                    }
 
                     // Sync pause/play state
                     if (s.paused && card._state !== 'paused') {

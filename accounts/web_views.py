@@ -587,9 +587,18 @@ def _get_eligible_accounts_for_sidebar():
     day_name = today.strftime('%A')
 
     all_accounts = list(
-        AccountDetail.objects.select_related('play_info', 'platform', 'security')
+        AccountDetail.objects.select_related('play_info', 'platform', 'security', 'last_transaction')
         .filter(is_active=True)
     )
+
+    # Accounts with pending first withdrawal (first_withdraw=False or no LastTransaction + pending withdrawal)
+    pending_wd_account_ids = set(
+        Withdrawal.objects.filter(status='pending').values_list('account_id', flat=True)
+    )
+    first_wd_done_ids = set(
+        LastTransaction.objects.filter(first_withdraw=True).values_list('account_id', flat=True)
+    )
+    pending_first_wd_ids = pending_wd_account_ids - first_wd_done_ids
 
     today_sessions = PlaySession.objects.filter(
         session_date=today, is_pending=False, is_active=False
@@ -631,6 +640,8 @@ def _get_eligible_accounts_for_sidebar():
 
     eligible = []
     for acc in all_accounts:
+        if acc.id in pending_first_wd_ids:
+            continue
         try:
             hours = acc.play_info.schedule_of_the_week.get(day_name, -1)
         except Exception:
@@ -723,7 +734,16 @@ def eligible_account(request):
             except ValueError:
                 pass
 
-    excluded_ids = active_ids | client_excluded
+    # Accounts with pending first withdrawal (first_withdraw=False or no LastTransaction + pending withdrawal)
+    pending_wd_account_ids = set(
+        Withdrawal.objects.filter(status='pending').values_list('account_id', flat=True)
+    )
+    first_wd_done_ids = set(
+        LastTransaction.objects.filter(first_withdraw=True).values_list('account_id', flat=True)
+    )
+    pending_first_wd_ids = pending_wd_account_ids - first_wd_done_ids
+
+    excluded_ids = active_ids | client_excluded | pending_first_wd_ids
 
     # Total minutes already played today per account (non-pending sessions only)
     today_sessions = PlaySession.objects.filter(
@@ -1556,9 +1576,10 @@ def deposit_withdrawal_history(request):
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
     status = request.GET.get('status', '').strip()
+    op_type = request.GET.get('op', '').strip()
 
-    dep_qs = Deposit.objects.select_related('account', 'account__platform', 'network')
-    wd_qs = Withdrawal.objects.select_related('account', 'account__platform', 'network', 'account__last_transaction')
+    dep_qs = Deposit.objects.select_related('account', 'account__platform', 'network') if op_type != 'withdrawal' else Deposit.objects.none()
+    wd_qs = Withdrawal.objects.select_related('account', 'account__platform', 'network', 'account__last_transaction') if op_type != 'deposit' else Withdrawal.objects.none()
 
     if q:
         dep_qs = dep_qs.filter(Q(account__nick__icontains=q) | Q(account__security__api__icontains=q))
@@ -1593,7 +1614,7 @@ def deposit_withdrawal_history(request):
             'wallet': e.wallet or '',
             'amount': str(e.amount),
             'status': e.status,
-            'created_at': e.created_at.strftime('%Y-%m-%d %H:%M'),
+            'created_at': timezone.localtime(e.created_at).strftime('%Y-%m-%d %H:%M'),
         })
     for e in wd_qs:
         try:
@@ -1612,7 +1633,7 @@ def deposit_withdrawal_history(request):
             'amount': str(e.amount),
             'status': e.status,
             'first_withdraw': first_wd,
-            'created_at': e.created_at.strftime('%Y-%m-%d %H:%M'),
+            'created_at': timezone.localtime(e.created_at).strftime('%Y-%m-%d %H:%M'),
         })
 
     entries.sort(key=lambda x: x['created_at'], reverse=True)

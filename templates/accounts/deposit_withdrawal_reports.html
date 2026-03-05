@@ -90,6 +90,14 @@
                         <option value="cancelled">Cancelled</option>
                     </select>
                 </div>
+                <div class="col-md-1">
+                    <label class="form-label small text-muted mb-1">Operation</label>
+                    <select id="filter-op" class="form-select">
+                        <option value="">All</option>
+                        <option value="deposit">Deposit</option>
+                        <option value="withdrawal">Withdrawal</option>
+                    </select>
+                </div>
                 <div class="col-md-2 d-flex gap-2">
                     <button id="btn-filter" class="btn btn-primary flex-fill">
                         <i class="bi bi-funnel"></i> Filter
@@ -346,9 +354,11 @@ document.getElementById('btn-filter').addEventListener('click', function () {
     var from = document.getElementById('filter-from').value;
     var to = document.getElementById('filter-to').value;
     var status = document.getElementById('filter-status').value;
+    var op = document.getElementById('filter-op').value;
     if (from) params.date_from = from;
     if (to) params.date_to = to;
     if (status) params.status = status;
+    if (op) params.op = op;
     params.page = 1;
     loadHistory(params);
 });
@@ -362,6 +372,7 @@ document.getElementById('btn-clear').addEventListener('click', function () {
     document.getElementById('filter-from').value = '';
     document.getElementById('filter-to').value = '';
     document.getElementById('filter-status').value = '';
+    document.getElementById('filter-op').value = '';
     loadHistory();
 });
 

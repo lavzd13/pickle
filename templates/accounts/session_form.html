@@ -14,9 +14,15 @@
                 <form method="post">
                     {% csrf_token %}
                     
-                    <div class="mb-3">
-                        <label for="{{ form.account.id_for_label }}" class="form-label">Account *</label>
-                        {{ form.account }}
+                    <div class="mb-3 position-relative">
+                        <label class="form-label">Account *</label>
+                        <input type="text" id="account-search" class="form-control" placeholder="Search by nickname or API key..." autocomplete="off"{% if form.account.value %} style="display:none;"{% endif %}>
+                        <input type="hidden" name="account" id="account-id" value="{{ form.account.value|default:'' }}">
+                        <div id="account-results" class="list-group position-absolute shadow" style="z-index:100; display:none; max-height:250px; overflow-y:auto; width:100%;"></div>
+                        <div id="selected-account" class="mt-2"{% if not form.account.value %} style="display:none;"{% endif %}>
+                            <span class="badge bg-primary" id="selected-badge">{% if form.instance.account %}{{ form.instance.account.nick }}{% endif %}</span>
+                            <button type="button" class="btn btn-sm btn-link p-0 ms-2 text-secondary" id="btn-clear-account">Change</button>
+                        </div>
                         {% if form.account.errors %}
                         <div class="text-danger">{{ form.account.errors }}</div>
                         {% endif %}
@@ -89,4 +95,62 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var searchInput = document.getElementById('account-search');
+    var resultsDiv = document.getElementById('account-results');
+    var hiddenInput = document.getElementById('account-id');
+    var timer = null;
+
+    searchInput.addEventListener('input', function () {
+        clearTimeout(timer);
+        var q = this.value.trim();
+        if (q.length < 1) { resultsDiv.style.display = 'none'; return; }
+        timer = setTimeout(function () {
+            fetch('/account-search/?q=' + encodeURIComponent(q))
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    resultsDiv.innerHTML = '';
+                    if (!data.results.length) {
+                        resultsDiv.innerHTML = '<div class="list-group-item text-muted">No accounts found</div>';
+                        resultsDiv.style.display = '';
+                        return;
+                    }
+                    data.results.forEach(function (acc) {
+                        var item = document.createElement('a');
+                        item.href = '#';
+                        item.className = 'list-group-item list-group-item-action py-2';
+                        item.textContent = acc.nick + ' (' + (acc.platform || 'N/A') + ')' + (acc.api ? '  —  ' + acc.api : '');
+                        item.addEventListener('click', function (e) {
+                            e.preventDefault();
+                            hiddenInput.value = acc.id;
+                            document.getElementById('selected-badge').textContent = acc.nick + ' (' + (acc.platform || 'N/A') + ')';
+                            document.getElementById('selected-account').style.display = '';
+                            searchInput.style.display = 'none';
+                            resultsDiv.style.display = 'none';
+                        });
+                        resultsDiv.appendChild(item);
+                    });
+                    resultsDiv.style.display = '';
+                });
+        }, 250);
+    });
+
+    document.addEventListener('click', function (e) {
+        if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target))
+            resultsDiv.style.display = 'none';
+    });
+
+    document.getElementById('btn-clear-account').addEventListener('click', function () {
+        hiddenInput.value = '';
+        searchInput.value = '';
+        searchInput.style.display = '';
+        document.getElementById('selected-account').style.display = 'none';
+        searchInput.focus();
+    });
+})();
+</script>
 {% endblock %}
