@@ -155,6 +155,7 @@ class PlayInfo(models.Model):
     play_days_per_week = models.FloatField(blank=False)
     hours_per_day = models.FloatField(blank=True)
     schedule_of_the_week = models.JSONField(default=default_schedule)
+    session_durations = models.JSONField(default=list, blank=True, help_text="Actual session durations played today (in minutes). Resets daily.")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

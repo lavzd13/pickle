@@ -32,7 +32,7 @@
             <div class="card-body p-0">
                 <div id="eligible-list" class="list-group list-group-flush" style="max-height: 75vh; overflow-y: auto;">
                     {% for a in eligible_accounts %}
-                    <div class="list-group-item d-flex justify-content-between align-items-center py-1 px-2 eligible-item" data-nick="{{ a.nick }}"{% if a.in_session %} style="background-color: #d1f5d3;"{% endif %}>
+                    <div class="list-group-item d-flex justify-content-between align-items-center py-1 px-2 eligible-item" data-nick="{{ a.nick }}"{% if a.in_session %} style="background-color: #d1f5d3;"{% elif a.on_break %} style="background-color: #ffe8cc;"{% endif %}>
                         <span style="font-size:0.8rem;">
                             {{ a.nick }}
                             {% if a.platform %}<small class="text-muted">- {{ a.platform }}{% if a.app_id %} ({{ a.app_id }}){% endif %}</small>{% endif %}
@@ -865,7 +865,7 @@
                     eligibleNicks.add(a.nick);
                     var el = document.querySelector('.eligible-item[data-nick="' + a.nick + '"]');
                     if (!el) return;
-                    el.style.backgroundColor = a.in_session ? '#d1f5d3' : '';
+                    el.style.backgroundColor = a.in_session ? '#d1f5d3' : a.on_break ? '#ffe8cc' : '';
                     var badge = el.querySelector('.badge');
                     if (badge) {
                         badge.textContent = a.remaining + 'm';

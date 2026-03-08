@@ -581,17 +581,18 @@ def user_delete(request, pk):
     })
 
 def _get_eligible_accounts_for_sidebar():
-    """Compute today's eligible accounts with remaining minutes for the sidebar."""
+    """Compute today's eligible accounts using the same rules as the PLAY button."""
     from datetime import datetime as _dt
     today = timezone.localdate()
     day_name = today.strftime('%A')
+    now_utc = timezone.now()
 
     all_accounts = list(
         AccountDetail.objects.select_related('play_info', 'platform', 'security', 'last_transaction')
         .filter(is_active=True)
     )
 
-    # Accounts with pending first withdrawal (first_withdraw=False or no LastTransaction + pending withdrawal)
+    # Accounts with pending first withdrawal
     pending_wd_account_ids = set(
         Withdrawal.objects.filter(status='pending').values_list('account_id', flat=True)
     )
@@ -600,43 +601,36 @@ def _get_eligible_accounts_for_sidebar():
     )
     pending_first_wd_ids = pending_wd_account_ids - first_wd_done_ids
 
-    today_sessions = PlaySession.objects.filter(
-        session_date=today, is_pending=False, is_active=False
+    # Active (playing/pending/done) account IDs
+    active_ids = set(
+        PlaySession.objects.filter(session_date=today, is_active=True).values_list('account_id', flat=True)
     )
+
+    # Accounts on break
+    on_break_ids = set(
+        PlaySession.objects.filter(break_until__gt=now_utc).values_list('account_id', flat=True)
+    )
+
+    # Total minutes played today per account (non-pending sessions only)
+    today_sessions = PlaySession.objects.filter(session_date=today, is_pending=False)
     played_minutes = {}
+    now_naive = timezone.localtime().replace(tzinfo=None)
     for s in today_sessions:
         start_dt = _dt.combine(today, s.start_time)
-        end_dt = _dt.combine(today, s.end_time)
-        if end_dt < start_dt:
-            end_dt += timedelta(days=1)
-        mins = (end_dt - start_dt).total_seconds() / 60
-        played_minutes[s.account_id] = played_minutes.get(s.account_id, 0) + mins
-
-    now_naive = timezone.localtime().replace(tzinfo=None)
-    active_qs = PlaySession.objects.filter(
-        session_date=today, is_active=True, is_pending=False, is_done=False
-    )
-    active_ids = set()
-    for s in active_qs:
-        active_ids.add(s.account_id)
-        start_dt = _dt.combine(today, s.start_time)
-        if s.paused and s.pause_time:
-            elapsed_end = timezone.localtime(s.pause_time).replace(tzinfo=None)
+        if s.is_active and not s.is_done:
+            # Active playing session — use elapsed time
+            if s.paused and s.pause_time:
+                elapsed_end = timezone.localtime(s.pause_time).replace(tzinfo=None)
+            else:
+                elapsed_end = now_naive
+            mins = (elapsed_end - start_dt).total_seconds() / 60
         else:
-            elapsed_end = now_naive
-        mins = (elapsed_end - start_dt).total_seconds() / 60
+            # Finished session
+            end_dt = _dt.combine(today, s.end_time)
+            if end_dt < start_dt:
+                end_dt += timedelta(days=1)
+            mins = (end_dt - start_dt).total_seconds() / 60
         played_minutes[s.account_id] = played_minutes.get(s.account_id, 0) + mins
-
-    active_ids |= set(
-        PlaySession.objects.filter(
-            session_date=today, is_active=True, is_pending=True
-        ).values_list('account_id', flat=True)
-    )
-    active_ids |= set(
-        PlaySession.objects.filter(
-            session_date=today, is_active=True, is_done=True
-        ).values_list('account_id', flat=True)
-    )
 
     eligible = []
     for acc in all_accounts:
@@ -650,19 +644,20 @@ def _get_eligible_accounts_for_sidebar():
             continue
         schedule_minutes = hours * 60
         remaining = round(schedule_minutes - played_minutes.get(acc.id, 0))
+        if remaining < 20:
+            continue
         app_id = ''
         try:
             app_id = acc.security.app_id or ''
         except Exception:
             pass
-        if remaining < 20:
-            continue
         eligible.append({
             'nick': acc.nick,
             'platform': str(acc.platform) if acc.platform else '',
             'app_id': app_id,
             'remaining': remaining,
             'in_session': acc.id in active_ids,
+            'on_break': acc.id in on_break_ids,
         })
     eligible.sort(key=lambda x: x['nick'].lower())
     return eligible
@@ -718,6 +713,14 @@ def eligible_account(request):
 
     # Delete stale pending sessions from previous days
     PlaySession.objects.filter(is_pending=True, session_date__lt=today).delete()
+
+    # Reset session_durations for accounts that have no completed sessions today (new day)
+    accounts_with_sessions_today = set(
+        PlaySession.objects.filter(session_date=today, is_pending=False).values_list('account_id', flat=True)
+    )
+    PlayInfo.objects.exclude(session_durations=[]).exclude(
+        account_id__in=accounts_with_sessions_today
+    ).update(session_durations=[])
 
     # Active (playing or pending) account IDs — all excluded from selection
     active_ids = set(
@@ -784,7 +787,7 @@ def eligible_account(request):
             continue
         schedule_minutes = hours * 60
         remaining = schedule_minutes - played_minutes.get(acc.id, 0)
-        if remaining < 20:  # not enough time left for even a minimum session
+        if remaining < 20:
             continue
         if acc.id in on_break_map:
             on_break_eligible.append((acc, remaining, on_break_map[acc.id]))
@@ -802,8 +805,16 @@ def eligible_account(request):
 
     acc, remaining_minutes = random.choice(eligible)
     max_duration = min(150, int(remaining_minutes))
-    target_median = min(75, (20 + max_duration) / 2)
-    duration_minutes = round(gaussian_sample(20, max_duration, target_median))
+    used_durations = set(acc.play_info.session_durations or [])
+    # Generate a duration that hasn't been played today for this account
+    duration_minutes = None
+    for _attempt in range(50):
+        duration_minutes = round(gaussian_sample(20, max_duration, 75))
+        if duration_minutes >= max_duration:
+            duration_minutes = max_duration
+            break
+        if duration_minutes not in used_durations:
+            break
 
     account_data = {
         'id': acc.id,
@@ -1232,6 +1243,16 @@ def stop_session(request):
     session.break_until = timezone.now() + timedelta(minutes=break_minutes)
     session.notes = f"Given duration: {given_duration} min; Actual duration: {actual_minutes} min; Remaining: {remaining_after} min"
     session.save(update_fields=['end_time', 'is_done', 'paused', 'break_until', 'notes'])
+
+    # Record actual played duration in PlayInfo.session_durations
+    try:
+        play_info = session.account.play_info
+        durations = play_info.session_durations or []
+        durations.append(actual_minutes)
+        play_info.session_durations = durations
+        play_info.save(update_fields=['session_durations'])
+    except PlayInfo.DoesNotExist:
+        pass
 
     return JsonResponse({'ok': True, 'remaining_after': remaining_after})
 
