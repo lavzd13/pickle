@@ -60,6 +60,7 @@
             <div class="d-flex justify-content-between align-items-center mb-2" style="position: relative;">
                 <div>
                     <h5 class="card-title fw-bold mb-0"><span class="card-nick"></span></h5>
+                    <small class="card-last-session-ago text-muted" style="display:none; font-size:0.78rem;"></small>
                 </div>
                 <div class="card-last-session-wrapper" style="display:none; position: absolute; left: 50%; transform: translateX(-50%);">
                     <span class="badge bg-warning text-dark" style="font-size:0.95rem; padding:0.4em 1em; letter-spacing:0.03em; white-space:nowrap;">Last Session</span>
@@ -274,14 +275,14 @@
                     else { showNoAccounts(); }
                     return;
                 }
-                addSessionCard(data.account, data.duration_minutes, data.remaining_minutes, null, data.session_id);
+                addSessionCard(data.account, data.duration_minutes, data.remaining_minutes, null, data.session_id, data.last_session_minutes_ago);
             })
             .catch(showNoAccounts);
     }
 
     // ─── Create pending card ────────────────────────────────────────────────────
 
-    function addSessionCard(account, durationMinutes, remainingMinutes, expiresAtMs, pendingSessionId) {
+    function addSessionCard(account, durationMinutes, remainingMinutes, expiresAtMs, pendingSessionId, lastSessionMinutesAgo) {
         displayedAccountIds.add(account.id);
 
         var tpl = document.getElementById('session-card-tpl');
@@ -294,6 +295,13 @@
 
         if (sessionId) cardBySessionId[sessionId] = card;
         fillAccountInfo(card, account);
+        if (lastSessionMinutesAgo !== null && lastSessionMinutesAgo !== undefined) {
+            var agoEl = card.querySelector('.card-last-session-ago');
+            var h = Math.floor(lastSessionMinutesAgo / 60);
+            var m = lastSessionMinutesAgo % 60;
+            agoEl.textContent = 'Last session: ' + (h > 0 ? h + 'h ' + m + 'min' : m + ' min') + ' ago';
+            agoEl.style.display = 'block';
+        }
         card.querySelector('.card-duration').textContent = durationMinutes;
         card.querySelector('.card-remaining').textContent = remainingMinutes;
 
@@ -826,7 +834,7 @@
                 (data.pending || []).forEach(function (p) {
                     serverIds.add(p.session_id);
                     if (!cardBySessionId[p.session_id]) {
-                        addSessionCard(p.account, p.duration_minutes, p.remaining_minutes, Date.now() + p.expires_in_seconds * 1000, p.session_id);
+                        addSessionCard(p.account, p.duration_minutes, p.remaining_minutes, Date.now() + p.expires_in_seconds * 1000, p.session_id, p.last_session_minutes_ago);
                         sortSessionCards();
                     }
                     var pCard = cardBySessionId[p.session_id];
