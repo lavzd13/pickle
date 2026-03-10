@@ -8,10 +8,9 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.contrib.auth.models import User
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.utils import timezone
 from .models import PlaySession, AccountDetail, Payment, Location, Security, LastTransaction, PlayInfo, Deposit, Withdrawal, Network, Platform, ProxyVpn, WalletProvider, DepositOrder, WithdrawalOrder, CountryBlackList, SMSPlatform, DeviceCommand
-from django.db.models import Sum
 from django.forms import modelformset_factory
 from django.http import JsonResponse, HttpResponse, Http404
 from django.views.decorators.csrf import csrf_exempt
@@ -1712,6 +1711,11 @@ self.addEventListener('message', function(event) {
 });
 """
     return HttpResponse(js, content_type='application/javascript')
+
+@login_required
+def acc_creation_guide(request):
+    return render(request, 'accounts/acc_creation_guide.html')
+
 
 @login_required
 @user_passes_test(is_superuser)

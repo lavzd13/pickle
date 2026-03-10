@@ -183,8 +183,12 @@
                                 <i class="bi bi-slash-circle me-2"></i>Country Blacklist
                             </a>
                         </li>
-
                         {% endif %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'acc_creation_guide' %}active{% endif %}" href="{% url 'acc_creation_guide' %}">
+                                <i class="bi bi-journal-check"></i> Acc. Creation Guide
+                            </a>
+                        </li>
                     </ul>
                     
                     <hr class="text-white">

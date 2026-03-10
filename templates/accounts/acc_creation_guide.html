@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}Acc. Creation Guide{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8 col-xl-6">
+        <h3 class="mb-4">Acc. Creation Guide</h3>
+
+        <!-- Progress -->
+        <div class="mb-3">
+            <small class="text-muted">Step <span id="currentStep">1</span> of 10</small>
+            <div class="progress mt-1" style="height: 6px;">
+                <div class="progress-bar" id="progressBar" style="width: 10%;"></div>
+            </div>
+        </div>
+
+        <!-- Step 1 -->
+        <div class="card step-card" data-step="1">
+            <div class="card-header"><h5 class="mb-0">1. Proxy & SMS Availability</h5></div>
+            <div class="card-body">
+                <div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c1_1">
+                    <label class="form-check-label" for="c1_1">Check if desired proxy have available numbers on Grizzly or SMSFast</label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c1_2">
+                    <label class="form-check-label" for="c1_2">Buy proxy</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="card step-card d-none" data-step="2">
+            <div class="card-header"><h5 class="mb-0">2. VPN & Proxy Setup</h5></div>
+            <div class="card-body">
+                <div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c2_1">
+                    <label class="form-check-label" for="c2_1">Setup Drony with proxy info on emulator</label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c2_2">
+                    <label class="form-check-label" for="c2_2">Put VPN as always ON and put block any connection without VPN ON</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="card step-card d-none" data-step="3">
+            <div class="card-header"><h5 class="mb-0">3. IP Verification</h5></div>
+            <div class="card-body">
+                <div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c3_1">
+                    <label class="form-check-label" for="c3_1">Check IP address on 2ip.io if it matches with proxy IP address</label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c3_2">
+                    <label class="form-check-label" for="c3_2">Run anonymity test on 2ip.io and check for results</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="card step-card d-none" data-step="4">
+            <div class="card-header"><h5 class="mb-0">4. Timezone Setup</h5></div>
+            <div class="card-body">
+                <div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c4_1">
+                    <label class="form-check-label" for="c4_1">Put time zone on the phone to be same as time zone of city in which is proxy based, put 24-hour format for time</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="card step-card d-none" data-step="5">
+            <div class="card-header"><h5 class="mb-0">5. App Installation</h5></div>
+            <div class="card-body">
+                <div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c5_1">
+                    <label class="form-check-label" for="c5_1">Start Pokerclans app and wait for download to finish then exit app</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 6 -->
+        <div class="card step-card d-none" data-step="6">
+            <div class="card-header"><h5 class="mb-0">6. Location Setup</h5></div>
+            <div class="card-body">
+                <div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c6_1">
+                    <label class="form-check-label" for="c6_1">Check in which city is proxy, find that city on maps and pick any house from it and take coordinates</label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c6_2">
+                    <label class="form-check-label" for="c6_2">Put coordinates into the updater and run it</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 7 -->
+        <div class="card step-card d-none" data-step="7">
+            <div class="card-header"><h5 class="mb-0">7. Registration</h5></div>
+            <div class="card-body">
+                <div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c7_1">
+                    <label class="form-check-label" for="c7_1">Enter the app</label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c7_2">
+                    <label class="form-check-label" for="c7_2">Start registering process</label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c7_3">
+                    <label class="form-check-label" for="c7_3">Order number from SMS platform</label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c7_4">
+                    <label class="form-check-label" for="c7_4">Once you get the code, go create new account and fill info in the pickle accordingly</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 8 -->
+        <div class="card step-card d-none" data-step="8">
+            <div class="card-header"><h5 class="mb-0">8. Nickname Verification</h5></div>
+            <div class="card-body">
+                <div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c8_1">
+                    <label class="form-check-label" for="c8_1">Enter lobby, check if nickname is fetched in DB and if it is changed. If it is changed put new nickname everywhere, except the pokerapp</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 9 -->
+        <div class="card step-card d-none" data-step="9">
+            <div class="card-header"><h5 class="mb-0">9. API Key Setup</h5></div>
+            <div class="card-body">
+                <div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c9_1">
+                    <label class="form-check-label" for="c9_1">Create new API, put it into DB also in the pickle</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 10 -->
+        <div class="card step-card d-none" data-step="10">
+            <div class="card-header"><h5 class="mb-0">10. Done</h5></div>
+            <div class="card-body text-center">
+                <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
+                <p class="mt-3 mb-0 fw-bold">Account creation complete!</p>
+            </div>
+        </div>
+
+        <!-- Navigation Buttons -->
+        <div class="d-flex justify-content-between mt-3">
+            <button class="btn btn-secondary" id="btnPrev" disabled>
+                <i class="bi bi-arrow-left"></i> Previous
+            </button>
+            <button class="btn btn-primary" id="btnNext" disabled>
+                Next <i class="bi bi-arrow-right"></i>
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const totalSteps = 10;
+    let current = 1;
+
+    const cards = document.querySelectorAll('.step-card');
+    const btnPrev = document.getElementById('btnPrev');
+    const btnNext = document.getElementById('btnNext');
+    const stepLabel = document.getElementById('currentStep');
+    const progressBar = document.getElementById('progressBar');
+
+    function showStep(step) {
+        cards.forEach(c => {
+            c.classList.toggle('d-none', parseInt(c.dataset.step) !== step);
+        });
+        stepLabel.textContent = step;
+        progressBar.style.width = (step / totalSteps * 100) + '%';
+        btnPrev.disabled = (step === 1);
+        updateNextBtn();
+    }
+
+    function updateNextBtn() {
+        if (current === totalSteps) {
+            btnNext.disabled = true;
+            return;
+        }
+        const activeCard = document.querySelector('.step-card[data-step="' + current + '"]');
+        const checks = activeCard.querySelectorAll('.step-check');
+        const allChecked = checks.length === 0 || Array.from(checks).every(c => c.checked);
+        btnNext.disabled = !allChecked;
+    }
+
+    document.querySelectorAll('.step-check').forEach(cb => {
+        cb.addEventListener('change', updateNextBtn);
+    });
+
+    btnNext.addEventListener('click', function() {
+        if (current < totalSteps) {
+            current++;
+            showStep(current);
+        }
+    });
+
+    btnPrev.addEventListener('click', function() {
+        if (current > 1) {
+            current--;
+            showStep(current);
+        }
+    });
+
+    showStep(1);
+})();
+</script>
+{% endblock %}
