@@ -68,6 +68,9 @@ path('play/start-session/', web_views.start_session_play, name='start_session_pl
     path('proxy-vpns/add/', web_views.proxyvpn_add, name='proxyvpn_add'),
     path('wallet-providers/add/', web_views.wallet_provider_add, name='wallet_provider_add'),
 
+    # Acc. Creation Guide
+    path('acc-creation-guide/', web_views.acc_creation_guide, name='acc_creation_guide'),
+
     # Country Blacklist
     path('country-blacklist/', web_views.country_blacklist, name='country_blacklist'),
     path('country-blacklist/add/', web_views.country_blacklist_add, name='country_blacklist_add'),

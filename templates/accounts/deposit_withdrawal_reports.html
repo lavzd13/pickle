@@ -139,7 +139,7 @@
             </div>
         </div>
         <!-- Pagination -->
-        <div class="card-footer bg-transparent d-flex justify-content-between align-items-center py-2" id="pagination-footer" style="display:none!important;">
+        <div class="card-footer bg-transparent d-none d-flex justify-content-between align-items-center py-2" id="pagination-footer">
             <small class="text-muted" id="pagination-info"></small>
             <div class="d-flex gap-2">
                 <button class="btn btn-sm btn-outline-secondary" id="btn-prev" disabled>&laquo; Prev</button>
@@ -247,7 +247,7 @@ function loadHistory(params) {
 
             if (!data.entries.length) {
                 tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No entries found</td></tr>';
-                document.getElementById('pagination-footer').style.display = 'none';
+                document.getElementById('pagination-footer').classList.add('d-none');
                 return;
             }
             tbody.innerHTML = '';
@@ -298,14 +298,14 @@ function loadHistory(params) {
             // Pagination controls
             var footer = document.getElementById('pagination-footer');
             if (pg.total_pages > 1) {
-                footer.style.display = '';
+                footer.classList.remove('d-none');
                 var start = (pg.page - 1) * 25 + 1;
                 var end = Math.min(pg.page * 25, pg.total_count);
                 document.getElementById('pagination-info').textContent = 'Showing ' + start + '–' + end + ' of ' + pg.total_count;
                 document.getElementById('btn-prev').disabled = (pg.page <= 1);
                 document.getElementById('btn-next').disabled = (pg.page >= pg.total_pages);
             } else {
-                footer.style.display = 'none';
+                footer.classList.add('d-none');
             }
         });
 }
