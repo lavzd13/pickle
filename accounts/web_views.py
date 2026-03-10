@@ -815,6 +815,18 @@ def eligible_account(request):
         if duration_minutes not in used_durations:
             break
 
+    # Calculate how long ago the last session ended for this account
+    last_session = PlaySession.objects.filter(
+        account=acc, is_pending=False
+    ).order_by('-session_date', '-end_time').first()
+    last_session_minutes_ago = None
+    if last_session:
+        end_dt = _dt.combine(last_session.session_date, last_session.end_time)
+        now_naive = now_local.replace(tzinfo=None)
+        diff = (now_naive - end_dt).total_seconds() / 60
+        if diff >= 0:
+            last_session_minutes_ago = round(diff)
+
     account_data = {
         'id': acc.id,
         'nick': acc.nick,
@@ -850,6 +862,7 @@ def eligible_account(request):
         'duration_minutes': duration_minutes,
         'expires_in_seconds': 1200,
         'session_id': session.id,
+        'last_session_minutes_ago': last_session_minutes_ago,
     })
 
 
@@ -1010,6 +1023,16 @@ def active_sessions(request):
         except (ValueError, TypeError):
             duration_minutes, remaining_minutes = 60, 0
         acc = s.account
+        # Calculate how long ago the last session ended for this account
+        prev_session = PlaySession.objects.filter(
+            account=acc, is_pending=False
+        ).exclude(pk=s.pk).order_by('-session_date', '-end_time').first()
+        last_mins_ago = None
+        if prev_session:
+            prev_end = _dt.combine(prev_session.session_date, prev_session.end_time)
+            diff = (now_naive - prev_end).total_seconds() / 60
+            if diff >= 0:
+                last_mins_ago = round(diff)
         # Latest device command status
         dc = s.device_commands.order_by('-created_at').first()
         pending_result.append({
@@ -1017,6 +1040,7 @@ def active_sessions(request):
             'expires_in_seconds': expires_in,
             'duration_minutes': duration_minutes,
             'remaining_minutes': remaining_minutes,
+            'last_session_minutes_ago': last_mins_ago,
             'device_status': dc.status if dc else None,
             'device_error': dc.error_message if dc else '',
             'account': {
