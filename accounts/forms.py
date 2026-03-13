@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth.models import User
 from django.utils import timezone
-from .models import PlaySession, AccountDetail, Payment, WalletProvider, LastTransaction, Location, Security
+from .models import PlaySession, AccountDetail, Payment, WalletProvider, LastTransaction, Location, Security, Disciplines
 
 
 class PlaySessionForm(forms.ModelForm):
@@ -68,18 +68,24 @@ class AccountDetailForm(forms.ModelForm):
 
     class Meta:
         model = AccountDetail
-        fields = ['nick', 'device_name', 'email', 'platform', 'phone', 'creation_date']
+        fields = ['nick', 'device_name', 'email', 'platform', 'discipline', 'phone', 'creation_date']
         widgets = {
             'nick': forms.TextInput(attrs={'class': 'form-control'}),
             'device_name': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'platform': forms.Select(attrs={'class': 'form-control'}),
+            'discipline': forms.Select(attrs={'class': 'form-control'}),
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
             'creation_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Filter disciplines to the selected platform (or empty for new accounts)
+        if self.instance and self.instance.pk and self.instance.platform_id:
+            self.fields['discipline'].queryset = Disciplines.objects.filter(platform=self.instance.platform)
+        else:
+            self.fields['discipline'].queryset = Disciplines.objects.none()
         if not self.instance.pk and not self.initial.get('creation_date'):
             self.fields['creation_date'].initial = timezone.localdate()
         if self.instance and self.instance.pk:

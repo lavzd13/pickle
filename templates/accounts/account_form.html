@@ -44,7 +44,7 @@
                     </div>
                     
 					<div class="row">
-                    	<div class="col-md-4 mb-3">
+                    	<div class="col-md-3 mb-3">
                     	    <label for="{{ account_form.email.id_for_label }}" class="form-label">Email</label>
                     	    {{ account_form.email }}
                     	    {% if account_form.email.errors %}
@@ -52,7 +52,7 @@
                     	    {% endif %}
                     	</div>
 
-						<div class="col-md-4 mb-3">
+						<div class="col-md-3 mb-3">
                     	    <label for="{{ account_form.platform.id_for_label }}" class="form-label">Platform</label>
                     	    {{ account_form.platform }}
                     	    {% if account_form.platform.errors %}
@@ -61,7 +61,16 @@
                     	    <a href="{% url 'platform_add' %}?next={{ request.path }}" class="form-text text-primary text-decoration-none">+ Add new platform</a>
                     	</div>
 
-                        <div class="col-md-4 mb-3">
+						<div class="col-md-3 mb-3">
+                            <label for="{{ account_form.discipline.id_for_label }}" class="form-label">Discipline</label>
+                            {{ account_form.discipline }}
+                            {% if account_form.discipline.errors %}
+                            <div class="text-danger">{{ account_form.discipline.errors }}</div>
+                            {% endif %}
+                            <a href="#" id="add-discipline-link" class="form-text text-primary text-decoration-none">+ Add discipline</a>
+                        </div>
+
+                        <div class="col-md-3 mb-3">
                             <label for="{{ account_form.phone.id_for_label }}" class="form-label">Phone</label>
                             {{ account_form.phone }}
                             {% if account_form.phone.errors %}
@@ -312,4 +321,45 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    var platformSelect = document.getElementById('{{ account_form.platform.id_for_label }}');
+    var disciplineSelect = document.getElementById('{{ account_form.discipline.id_for_label }}');
+    var addLink = document.getElementById('add-discipline-link');
+    var currentDisciplineId = '{{ account_form.discipline.value|default:"" }}';
+
+    function updateDisciplines() {
+        var platformId = platformSelect.value;
+        if (platformId) {
+            addLink.href = '{% url "discipline_add" %}?platform=' + platformId + '&next={{ request.path }}';
+        } else {
+            addLink.href = '#';
+        }
+        disciplineSelect.innerHTML = '<option value="">---------</option>';
+        if (!platformId) return;
+        fetch('/disciplines/by-platform/?platform_id=' + platformId)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                data.disciplines.forEach(function(d) {
+                    var opt = document.createElement('option');
+                    opt.value = d.id;
+                    opt.textContent = d.name;
+                    if (String(d.id) === String(currentDisciplineId)) opt.selected = true;
+                    disciplineSelect.appendChild(opt);
+                });
+                currentDisciplineId = '';
+            });
+    }
+
+    platformSelect.addEventListener('change', function() {
+        currentDisciplineId = '';
+        updateDisciplines();
+    });
+
+    updateDisciplines();
+})();
+</script>
 {% endblock %}

@@ -52,12 +52,25 @@ class Network(models.Model):
     def __str__(self):
         return self.name
 
+class Disciplines(models.Model):
+    platform = models.ForeignKey(Platform, on_delete=models.SET_NULL, null=True, related_name='disciplines')
+    discipline = models.CharField(max_length=50)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'disciplines'
+        ordering = ['discipline']
+
+    def __str__(self):
+        return self.discipline
 
 class AccountDetail(models.Model):
     """Account details model - represents a gaming account (not a login user)"""
     nick = models.CharField(max_length=100)
     device_name = models.CharField(max_length=100, blank=True)
     platform = models.ForeignKey(Platform, on_delete=models.SET_NULL, null=True, blank=True)
+    discipline = models.ForeignKey(Disciplines, on_delete=models.SET_NULL, null=True, blank=True)
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=20, blank=True, null=True)
     is_new = models.BooleanField(default=False)
@@ -399,6 +412,23 @@ class CountryBlackList(models.Model):
 
     def __str__(self):
         return f"{self.country}"
+
+
+class Expense(models.Model):
+    """Business expenses tracking."""
+    expense = models.CharField(max_length=200)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='expenses')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'expenses'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.expense} - {self.amount}"
 
 
 class TaskLog(models.Model):

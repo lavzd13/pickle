@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block title %}Emulator Guide{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4" style="max-width: 900px;">
+
+    <div class="d-flex align-items-center gap-3 mb-4">
+        <a href="{% url 'instructions' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <h4 class="mb-0 fw-semibold"><i class="bi bi-phone me-2"></i>Emulator Guide</h4>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body py-4 text-center text-muted">
+            <i class="bi bi-cone-striped fs-1 d-block mb-3"></i>
+            <p class="mb-0">This guide is coming soon.</p>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

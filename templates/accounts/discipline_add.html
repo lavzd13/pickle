@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}Add Discipline{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 500px;">
+
+    <div class="d-flex align-items-center mb-4 gap-3">
+        <a href="{{ request.GET.next|default:'/accounts/create/' }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <h4 class="mb-0 fw-semibold">Add Discipline</h4>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label">Platform</label>
+                    <select name="platform" class="form-control" required>
+                        <option value="">-- Select platform --</option>
+                        {% for p in platforms %}
+                        <option value="{{ p.id }}" {% if selected_platform == p.id|stringformat:"d" %}selected{% endif %}>{{ p.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Discipline name</label>
+                    <input type="text" name="name" class="form-control" placeholder="e.g. NLH" required autofocus>
+                </div>
+                <input type="hidden" name="next" value="{{ request.GET.next }}">
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Add Discipline</button>
+                    <a href="{{ request.GET.next|default:'/accounts/create/' }}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
