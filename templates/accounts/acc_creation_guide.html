@@ -5,7 +5,12 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-lg-8 col-xl-6">
-        <h3 class="mb-4">Acc. Creation Guide</h3>
+        <div class="d-flex align-items-center gap-3 mb-4">
+            <a href="{% url 'instructions' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <h3 class="mb-0">Acc. Creation Guide</h3>
+        </div>
 
         <!-- Progress -->
         <div class="mb-3">
@@ -38,9 +43,21 @@
                     <input class="form-check-input step-check" type="checkbox" id="c2_1">
                     <label class="form-check-label" for="c2_1">Setup Drony with proxy info on emulator</label>
                 </div>
-                <div class="form-check mb-2">
+				<div class="form-check mb-2">
                     <input class="form-check-input step-check" type="checkbox" id="c2_2">
-                    <label class="form-check-label" for="c2_2">Put VPN as always ON and put block any connection without VPN ON</label>
+                    <label class="form-check-label" for="c2_2">Put proxy as SOCKS5 in Drony</label>
+                </div>
+				<div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c2_3">
+                    <label class="form-check-label" for="c2_3">Enable start option in Drony</label>
+                </div>
+				<div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c2_4">
+                    <label class="form-check-label" for="c2_4">Start Drony</label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c2_5">
+                    <label class="form-check-label" for="c2_5">Put VPN as always ON and put block any connection without VPN ON</label>
                 </div>
             </div>
         </div>
@@ -66,7 +83,15 @@
             <div class="card-body">
                 <div class="form-check mb-2">
                     <input class="form-check-input step-check" type="checkbox" id="c4_1">
-                    <label class="form-check-label" for="c4_1">Put time zone on the phone to be same as time zone of city in which is proxy based, put 24-hour format for time</label>
+                    <label class="form-check-label" for="c4_1">Find time zone of the city where proxy is based</label>
+                </div>
+				<div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c4_2">
+                    <label class="form-check-label" for="c4_2">Put the phone to be the same timezone as city where proxy is based</label>
+                </div>
+				<div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c4_3">
+                    <label class="form-check-label" for="c4_3">Put 24 hour format for time</label>
                 </div>
             </div>
         </div>
@@ -77,7 +102,15 @@
             <div class="card-body">
                 <div class="form-check mb-2">
                     <input class="form-check-input step-check" type="checkbox" id="c5_1">
-                    <label class="form-check-label" for="c5_1">Start Pokerclans app and wait for download to finish then exit app</label>
+                    <label class="form-check-label" for="c5_1">Start Pokerclans app</label>
+                </div>
+				<div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c5_2">
+                    <label class="form-check-label" for="c5_2">Wait for download to finish</label>
+                </div>
+				<div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c5_3">
+                    <label class="form-check-label" for="c5_3">Exit the app</label>
                 </div>
             </div>
         </div>
@@ -88,11 +121,15 @@
             <div class="card-body">
                 <div class="form-check mb-2">
                     <input class="form-check-input step-check" type="checkbox" id="c6_1">
-                    <label class="form-check-label" for="c6_1">Check in which city is proxy, find that city on maps and pick any house from it and take coordinates</label>
+                    <label class="form-check-label" for="c6_1">In google maps find city where proxy is based</label>
+                </div>
+				<div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c6_2">
+                    <label class="form-check-label" for="c6_2">Look for some house/building that looks valid and take coordinates from it</label>
                 </div>
                 <div class="form-check mb-2">
-                    <input class="form-check-input step-check" type="checkbox" id="c6_2">
-                    <label class="form-check-label" for="c6_2">Put coordinates into the updater and run it</label>
+                    <input class="form-check-input step-check" type="checkbox" id="c6_3">
+                    <label class="form-check-label" for="c6_3">Put coordinates into the updater and run it</label>
                 </div>
             </div>
         </div>
@@ -126,7 +163,19 @@
             <div class="card-body">
                 <div class="form-check mb-2">
                     <input class="form-check-input step-check" type="checkbox" id="c8_1">
-                    <label class="form-check-label" for="c8_1">Enter lobby, check if nickname is fetched in DB and if it is changed. If it is changed put new nickname everywhere, except the pokerapp</label>
+                    <label class="form-check-label" for="c8_1">Enter lobby, check if nickname is fetched in DB</label>
+                </div>
+				<div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c8_2">
+                    <label class="form-check-label" for="c8_2">If nickname is not fetched go enter some poker room which is not zoom, check DB after that</label>
+                </div>
+				<div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c8_3">
+                    <label class="form-check-label" for="c8_3">If nickname is still not fetched, then exit the app start it again and enter poker room, check DB</label>
+                </div>
+				<div class="form-check mb-2">
+                    <input class="form-check-input step-check" type="checkbox" id="c8_4">
+                    <label class="form-check-label" for="c8_4">Put the nickname from DB into pickle and rename emulator to be name as nickname</label>
                 </div>
             </div>
         </div>

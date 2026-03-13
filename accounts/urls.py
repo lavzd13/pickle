@@ -62,14 +62,25 @@ path('play/start-session/', web_views.start_session_play, name='start_session_pl
     path('deposit-withdrawal/history/', web_views.deposit_withdrawal_history, name='deposit_withdrawal_history'),
     path('account-search/', web_views.account_search, name='account_search'),
 
-    # Entity add pages (Platform, Network, ProxyVpn, WalletProvider)
+    # Expenses
+    path('expenses/', web_views.expenses_page, name='expenses_page'),
+    path('expenses/history/', web_views.expenses_history, name='expenses_history'),
+    path('expenses/create/', web_views.expense_create, name='expense_create'),
+    path('expenses/<int:pk>/', web_views.expense_detail, name='expense_detail'),
+    path('expenses/search/', web_views.expense_search, name='expense_search'),
+
+    # Entity add pages (Platform, Network, ProxyVpn, WalletProvider, Discipline)
+    path('disciplines/add/', web_views.discipline_add, name='discipline_add'),
+    path('disciplines/by-platform/', web_views.disciplines_by_platform, name='disciplines_by_platform'),
     path('platforms/add/', web_views.platform_add, name='platform_add'),
     path('networks/add/', web_views.network_add, name='network_add'),
     path('proxy-vpns/add/', web_views.proxyvpn_add, name='proxyvpn_add'),
     path('wallet-providers/add/', web_views.wallet_provider_add, name='wallet_provider_add'),
 
-    # Acc. Creation Guide
-    path('acc-creation-guide/', web_views.acc_creation_guide, name='acc_creation_guide'),
+    # Instructions
+    path('instructions/', web_views.instructions, name='instructions'),
+    path('instructions/acc-creation-guide/', web_views.acc_creation_guide, name='acc_creation_guide'),
+    path('instructions/emulator-guide/', web_views.emulator_guide, name='emulator_guide'),
 
     # Country Blacklist
     path('country-blacklist/', web_views.country_blacklist, name='country_blacklist'),

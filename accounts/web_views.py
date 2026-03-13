@@ -10,7 +10,7 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db.models import Q, Sum
 from django.utils import timezone
-from .models import PlaySession, AccountDetail, Payment, Location, Security, LastTransaction, PlayInfo, Deposit, Withdrawal, Network, Platform, ProxyVpn, WalletProvider, DepositOrder, WithdrawalOrder, CountryBlackList, SMSPlatform, DeviceCommand
+from .models import PlaySession, AccountDetail, Payment, Location, Security, LastTransaction, PlayInfo, Deposit, Withdrawal, Network, Platform, ProxyVpn, WalletProvider, DepositOrder, WithdrawalOrder, CountryBlackList, SMSPlatform, DeviceCommand, Disciplines, Expense
 from django.forms import modelformset_factory
 from django.http import JsonResponse, HttpResponse, Http404
 from django.views.decorators.csrf import csrf_exempt
@@ -1705,6 +1705,127 @@ def deposit_withdrawal_history(request):
     })
 
 
+@login_required
+@user_passes_test(is_superuser)
+def expenses_page(request):
+    """Expenses page — superuser only."""
+    now = timezone.localdate()
+    default_from = now.replace(day=1).isoformat()
+    last_day = calendar.monthrange(now.year, now.month)[1]
+    default_to = now.replace(day=last_day).isoformat()
+    return render(request, 'accounts/expenses.html', {
+        'default_from': default_from,
+        'default_to': default_to,
+    })
+
+
+@login_required
+@user_passes_test(is_superuser)
+def expenses_history(request):
+    """Return expenses as JSON, with optional filters."""
+    q = request.GET.get('q', '').strip()
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+
+    qs = Expense.objects.select_related('created_by').all()
+
+    if q:
+        qs = qs.filter(Q(expense__icontains=q) | Q(created_by__username__icontains=q))
+    if date_from:
+        qs = qs.filter(created_at__date__gte=date_from)
+    if date_to:
+        qs = qs.filter(created_at__date__lte=date_to)
+
+    total_expenses = qs.aggregate(total=Sum('amount'))['total'] or 0
+
+    entries = []
+    for e in qs:
+        entries.append({
+            'id': e.id,
+            'expense': e.expense,
+            'amount': str(e.amount),
+            'notes': e.notes,
+            'created_by': e.created_by.username if e.created_by else '',
+            'created_at': timezone.localtime(e.created_at).strftime('%Y-%m-%d %H:%M'),
+        })
+
+    # Pagination
+    page_size = 25
+    page = int(request.GET.get('page', 1))
+    total_count = len(entries)
+    total_pages = max(1, (total_count + page_size - 1) // page_size)
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * page_size
+    page_entries = entries[start:start + page_size]
+
+    return JsonResponse({
+        'entries': page_entries,
+        'total_expenses': str(total_expenses),
+        'pagination': {
+            'page': page,
+            'total_pages': total_pages,
+            'total_count': total_count,
+        },
+    })
+
+
+@login_required
+@user_passes_test(is_superuser)
+def expense_create(request):
+    """Create a new expense."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    import json
+    data = json.loads(request.body)
+    expense_name = data.get('expense', '').strip()
+    amount = data.get('amount')
+    notes = data.get('notes', '').strip()
+    if not expense_name or not amount:
+        return JsonResponse({'error': 'Expense and amount are required'}, status=400)
+    Expense.objects.create(
+        expense=expense_name,
+        amount=amount,
+        notes=notes,
+        created_by=request.user,
+    )
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@user_passes_test(is_superuser)
+def expense_detail(request, pk):
+    """View/edit/delete an expense."""
+    exp = get_object_or_404(Expense, pk=pk)
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'delete':
+            exp.delete()
+            messages.success(request, 'Expense deleted.')
+            return redirect('expenses_page')
+        exp.expense = request.POST.get('expense', exp.expense).strip()
+        exp.amount = request.POST.get('amount', exp.amount)
+        exp.notes = request.POST.get('notes', '').strip()
+        exp.save()
+        messages.success(request, 'Expense updated.')
+        return redirect('expense_detail', pk=pk)
+    return render(request, 'accounts/expense_detail.html', {'expense': exp})
+
+
+@login_required
+@user_passes_test(is_superuser)
+def expense_search(request):
+    """Autocomplete search for expenses by expense name or username."""
+    q = request.GET.get('q', '').strip()
+    if len(q) < 1:
+        return JsonResponse({'results': []})
+    expenses = Expense.objects.select_related('created_by').filter(
+        Q(expense__icontains=q) | Q(created_by__username__icontains=q)
+    ).values_list('expense', flat=True).distinct()[:10]
+    users = User.objects.filter(username__icontains=q).values_list('username', flat=True)[:10]
+    results = list(set(list(expenses) + list(users)))
+    return JsonResponse({'results': sorted(results)[:10]})
+
+
 def service_worker_js(request):
     js = """
 self.addEventListener('notificationclick', function(event) {
@@ -1737,8 +1858,16 @@ self.addEventListener('message', function(event) {
     return HttpResponse(js, content_type='application/javascript')
 
 @login_required
+def instructions(request):
+    return render(request, 'accounts/instructions.html')
+
+@login_required
 def acc_creation_guide(request):
     return render(request, 'accounts/acc_creation_guide.html')
+
+@login_required
+def emulator_guide(request):
+    return render(request, 'accounts/emulator_guide.html')
 
 
 @login_required
@@ -1791,6 +1920,33 @@ def sms_platform_add(request):
             SMSPlatform.objects.get_or_create(name=name, defaults={'created_by': request.user})
         return redirect('country_blacklist')
     return render(request, 'accounts/sms_platform_add.html')
+
+
+@login_required
+@user_passes_test(is_superuser)
+def discipline_add(request):
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        platform_id = request.POST.get('platform', '').strip()
+        if name and platform_id:
+            platform = get_object_or_404(Platform, pk=platform_id)
+            Disciplines.objects.get_or_create(discipline=name, platform=platform)
+        next_url = request.POST.get('next') or 'account_create'
+        return redirect(next_url)
+    return render(request, 'accounts/discipline_add.html', {
+        'platforms': Platform.objects.all().order_by('name'),
+        'selected_platform': request.GET.get('platform', ''),
+    })
+
+
+@login_required
+def disciplines_by_platform(request):
+    """Return disciplines for a given platform as JSON."""
+    platform_id = request.GET.get('platform_id')
+    if not platform_id:
+        return JsonResponse({'disciplines': []})
+    disciplines = Disciplines.objects.filter(platform_id=platform_id).order_by('discipline')
+    return JsonResponse({'disciplines': [{'id': d.id, 'name': d.discipline} for d in disciplines]})
 
 
 @login_required

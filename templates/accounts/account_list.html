@@ -135,10 +135,12 @@
                             <!-- Account -->
                             <div class="col-md-4">
                                 <p class="fw-semibold mb-1 mt-2">Account</p>
-                                <div>
+                                <div><span class="text-muted">Platform:</span> {{ account.platform|default:"-" }}</div>
+                                <div><span class="text-muted">Discipline:</span> {{ account.discipline|default:"-" }}</div>
+                                {% if account.email %}<div>
                                     <span class="text-muted">Email:</span> {{ account.email|default:"-" }}
-                                    {% if account.email %}<button class="btn btn-link p-0 ms-1 copy-btn" onclick="copyText(event, '{{ account.email|escapejs }}')" title="Copy"><i class="bi bi-clipboard"></i></button>{% endif %}
-                                </div>
+                                    <button class="btn btn-link p-0 ms-1 copy-btn" onclick="copyText(event, '{{ account.email|escapejs }}')" title="Copy"><i class="bi bi-clipboard"></i></button>
+                                </div>{% endif %}
                                 <div>
                                     <span class="text-muted">Phone:</span> {{ account.phone|default:"-" }}
                                     {% if account.phone %}<button class="btn btn-link p-0 ms-1 copy-btn" onclick="copyText(event, '{{ account.phone|escapejs }}')" title="Copy"><i class="bi bi-clipboard"></i></button>{% endif %}

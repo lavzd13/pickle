@@ -3,7 +3,7 @@ from .models import (
     AccountDetail, Payment, PlaySession, Platform,
     ProxyVpn, WalletProvider, Network,
     Location, Security, PlayInfo, LastTransaction,
-    Deposit, Withdrawal, TaskLog,
+    Deposit, Withdrawal, TaskLog, Disciplines, Expense,
 )
 
 
@@ -29,6 +29,13 @@ class WalletProviderAdmin(admin.ModelAdmin):
 class NetworkAdmin(admin.ModelAdmin):
     list_display = ['name', 'created_at']
     search_fields = ['name']
+
+
+@admin.register(Disciplines)
+class DisciplinesAdmin(admin.ModelAdmin):
+    list_display = ['discipline', 'platform', 'created_at']
+    search_fields = ['discipline']
+    list_filter = ['platform']
 
 
 @admin.register(AccountDetail)
@@ -125,6 +132,14 @@ class WithdrawalAdmin(admin.ModelAdmin):
     list_filter = ['network', 'created_by', 'created_at']
     search_fields = ['account__nick']
     readonly_fields = ['created_at']
+
+
+@admin.register(Expense)
+class ExpenseAdmin(admin.ModelAdmin):
+    list_display = ['expense', 'amount', 'created_by', 'created_at']
+    list_filter = ['created_by', 'created_at']
+    search_fields = ['expense']
+    readonly_fields = ['created_at', 'updated_at']
 
 
 @admin.register(TaskLog)

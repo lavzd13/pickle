@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Instructions{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4" style="max-width: 900px;">
+
+    <h4 class="fw-semibold mb-4"><i class="bi bi-journal-check me-2"></i>Instructions</h4>
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <a href="{% url 'acc_creation_guide' %}" class="text-decoration-none">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-person-plus fs-1 text-primary mb-3 d-block"></i>
+                        <h5 class="fw-semibold">Account Creation Guide</h5>
+                        <p class="text-muted small mb-0">Step-by-step checklist for creating new gaming accounts.</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-6">
+            <a href="{% url 'emulator_guide' %}" class="text-decoration-none">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-phone fs-1 text-success mb-3 d-block"></i>
+                        <h5 class="fw-semibold">Emulator Guide</h5>
+                        <p class="text-muted small mb-0">How to set up and use the Android emulator.</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
