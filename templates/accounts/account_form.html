@@ -81,8 +81,13 @@
 
                     <div class="row">
                         <div class="col-md-4 mb-3">
-                            <label for="{{ account_form.related_to.id_for_label }}" class="form-label">Related To (Main Account)</label>
+                            <label class="form-label">Related To (Main Account)</label>
                             {{ account_form.related_to }}
+                            <div class="position-relative">
+                                <input type="text" id="related-to-search" class="form-control" placeholder="Search by nickname..." autocomplete="off"
+                                    value="{% if account_form.related_to.value and account_form.instance.related_to %}{{ account_form.instance.related_to.nick }} ({{ account_form.instance.related_to.platform }}){% endif %}">
+                                <div id="related-to-results" class="list-group position-absolute w-100" style="z-index:1050; display:none; max-height:200px; overflow-y:auto;"></div>
+                            </div>
                             {% if account_form.related_to.errors %}
                             <div class="text-danger">{{ account_form.related_to.errors }}</div>
                             {% endif %}
@@ -371,6 +376,67 @@
     });
 
     updateDisciplines();
+})();
+
+// Related To autocomplete
+(function() {
+    var hiddenInput = document.getElementById('{{ account_form.related_to.id_for_label }}');
+    var searchInput = document.getElementById('related-to-search');
+    var resultsDiv = document.getElementById('related-to-results');
+    var debounceTimer = null;
+    var excludeId = '{{ account_form.instance.pk|default:"" }}';
+
+    searchInput.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        var q = searchInput.value.trim();
+        if (q.length < 1) {
+            resultsDiv.style.display = 'none';
+            hiddenInput.value = '';
+            return;
+        }
+        debounceTimer = setTimeout(function() {
+            var url = '/account-search/?q=' + encodeURIComponent(q) + '&related_to=1';
+            if (excludeId) url += '&exclude_id=' + excludeId;
+            fetch(url)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    resultsDiv.innerHTML = '';
+                    if (!data.results.length) {
+                        resultsDiv.innerHTML = '<div class="list-group-item text-muted small">No results</div>';
+                        resultsDiv.style.display = 'block';
+                        return;
+                    }
+                    data.results.forEach(function(acc) {
+                        var item = document.createElement('a');
+                        item.href = '#';
+                        item.className = 'list-group-item list-group-item-action py-1 px-2';
+                        item.style.fontSize = '0.9rem';
+                        item.textContent = acc.nick + (acc.platform ? ' (' + acc.platform + ')' : '');
+                        item.addEventListener('mousedown', function(e) {
+                            e.preventDefault();
+                            hiddenInput.value = acc.id;
+                            searchInput.value = acc.nick + (acc.platform ? ' (' + acc.platform + ')' : '');
+                            resultsDiv.style.display = 'none';
+                        });
+                        resultsDiv.appendChild(item);
+                    });
+                    resultsDiv.style.display = 'block';
+                });
+        }, 250);
+    });
+
+    searchInput.addEventListener('blur', function() {
+        setTimeout(function() { resultsDiv.style.display = 'none'; }, 200);
+    });
+
+    // Clear button: if user empties the field, clear the hidden input
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            searchInput.value = '';
+            hiddenInput.value = '';
+            resultsDiv.style.display = 'none';
+        }
+    });
 })();
 </script>
 {% endblock %}

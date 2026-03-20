@@ -1378,17 +1378,24 @@ def account_search(request):
         return JsonResponse({'results': []})
 
     qs = AccountDetail.objects.select_related('platform')
-    if request.GET.get('eligible'):
+    if request.GET.get('related_to'):
+        # Only accounts that can be a main (not themselves related to another)
+        exclude_id = request.GET.get('exclude_id')
+        qs = qs.filter(related_to__isnull=True, nick__icontains=q)
+        if exclude_id:
+            qs = qs.exclude(pk=exclude_id)
+        qs = qs[:10]
+    elif request.GET.get('eligible'):
         today_name = timezone.localdate().strftime('%A')
         qs = qs.filter(
             is_active=True,
             **{f'play_info__schedule_of_the_week__{today_name}__gt': 0}
         )
-    elif not request.user.is_superuser:
-        qs = qs.filter(play_sessions__created_by=request.user).distinct()
-
-    # Search by nick OR by API (left outer join via isnull handles missing Security)
-    qs = qs.filter(Q(nick__icontains=q) | Q(security__api__icontains=q))[:10]
+        qs = qs.filter(Q(nick__icontains=q) | Q(security__api__icontains=q))[:10]
+    else:
+        if not request.user.is_superuser:
+            qs = qs.filter(play_sessions__created_by=request.user).distinct()
+        qs = qs.filter(Q(nick__icontains=q) | Q(security__api__icontains=q))[:10]
 
     results = []
     for acc in qs:

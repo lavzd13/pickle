@@ -76,7 +76,7 @@ class AccountDetailForm(forms.ModelForm):
             'platform': forms.Select(attrs={'class': 'form-control'}),
             'discipline': forms.Select(attrs={'class': 'form-control'}),
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
-            'related_to': forms.Select(attrs={'class': 'form-control'}),
+            'related_to': forms.HiddenInput(),
             'creation_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
         }
 
