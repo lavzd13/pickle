@@ -72,6 +72,9 @@
                     </button>
                 </div>
             </div>
+            <div class="card-related-info mb-2" style="display:none; font-size:0.85rem;">
+                <span class="card-related-label text-muted"></span> <strong class="card-related-nicks"></strong>
+            </div>
             <div class="mb-2" style="font-size:0.9rem;">
                 <div><span class="text-muted">Device name:</span> <span class="card-device-name"></span></div>
                 <div><span class="text-muted">Platform:</span> <span class="card-platform"></span> <span class="card-app-id text-muted"></span></div>
@@ -231,6 +234,23 @@
         card.querySelector('.card-min-balance').textContent = account.min_balance || '0.00';
     }
 
+    function fillRelatedInfo(card, relatedToNick, relatedNicks) {
+        var infoEl = card.querySelector('.card-related-info');
+        var labelEl = card.querySelector('.card-related-label');
+        var nicksEl = card.querySelector('.card-related-nicks');
+        if (relatedToNick) {
+            // Sub account — show which main it belongs to
+            labelEl.textContent = 'Related to:';
+            nicksEl.textContent = relatedToNick;
+            infoEl.style.display = 'block';
+        } else if (relatedNicks && relatedNicks.length > 0) {
+            // Main account — show its sub accounts
+            labelEl.textContent = 'Related accounts:';
+            nicksEl.textContent = relatedNicks.join(', ');
+            infoEl.style.display = 'block';
+        }
+    }
+
     function removeCard(card, sessionId) {
         displayedAccountIds.delete(parseInt(card.dataset.accountId));
         delete cardBySessionId[sessionId];
@@ -275,26 +295,33 @@
                     else { showNoAccounts(); }
                     return;
                 }
-                addSessionCard(data.account, data.duration_minutes, data.remaining_minutes, null, data.session_id, data.last_session_minutes_ago);
+                var relNicks = (data.related_accounts || []).map(function (r) { return r.account.nick; });
+                addSessionCard(data.account, data.duration_minutes, data.remaining_minutes, null, data.session_id, data.last_session_minutes_ago, false, null, relNicks);
+                // Also create cards for related accounts
+                (data.related_accounts || []).forEach(function (rel) {
+                    addSessionCard(rel.account, data.duration_minutes, data.remaining_minutes, null, rel.session_id, null, true, rel.related_to_nick, []);
+                });
             })
             .catch(showNoAccounts);
     }
 
     // ─── Create pending card ────────────────────────────────────────────────────
 
-    function addSessionCard(account, durationMinutes, remainingMinutes, expiresAtMs, pendingSessionId, lastSessionMinutesAgo) {
+    function addSessionCard(account, durationMinutes, remainingMinutes, expiresAtMs, pendingSessionId, lastSessionMinutesAgo, isRelated, relatedToNick, relatedNicks) {
         displayedAccountIds.add(account.id);
 
         var tpl = document.getElementById('session-card-tpl');
         var card = tpl.content.cloneNode(true).querySelector('.session-card');
         card.dataset.accountId = account.id;
         card.dataset.sortPriority = '3';
+        card.dataset.isRelated = isRelated ? '1' : '';
         var sessionId = pendingSessionId || null;
         var isPending = true;
         card._state = 'pending';
 
         if (sessionId) cardBySessionId[sessionId] = card;
         fillAccountInfo(card, account);
+        fillRelatedInfo(card, relatedToNick, relatedNicks);
         if (lastSessionMinutesAgo !== null && lastSessionMinutesAgo !== undefined) {
             var agoEl = card.querySelector('.card-last-session-ago');
             var h = Math.floor(lastSessionMinutesAgo / 60);
@@ -306,6 +333,11 @@
         card.querySelector('.card-remaining').textContent = remainingMinutes;
 
         startPendingCountdown(card, expiresAtMs || (Date.now() + 20 * 60 * 1000), sessionId);
+
+        if (isRelated) {
+            card.style.borderLeft = '4px solid #6c757d';
+            card.querySelector('.card-quit-btn').style.display = 'none';
+        }
 
         // Start Device button
         card.querySelector('.card-start-device-btn').addEventListener('click', function () {
@@ -388,6 +420,10 @@
                 card.dataset.sortPriority = '4';
                 card.dataset.endMs = String(Date.now() + durationMinutes * 60000);
                 setupPauseResume(card, sessionId, account.id);
+                if (isRelated) {
+                    card.querySelector('.card-stop-btn').style.display = 'none';
+                    card.querySelector('.card-timeup-stop-btn').style.display = 'none';
+                }
                 sortSessionCards();
             });
         });
@@ -525,15 +561,18 @@
 
     // ─── Restore a playing/paused/timedout card from server data ────────────────
 
-    function restoreSessionCard(account, sessionId, secondsLeft, endTime, paused, createdBy, timedOut, remainingAfter) {
+    function restoreSessionCard(account, sessionId, secondsLeft, endTime, paused, createdBy, timedOut, remainingAfter, isRelated, relatedToNick, relatedNicks) {
         if (cardBySessionId[sessionId]) return; // already exists
         displayedAccountIds.add(account.id);
 
         var tpl = document.getElementById('session-card-tpl');
         var card = tpl.content.cloneNode(true).querySelector('.session-card');
         card.dataset.accountId = account.id;
+        card.dataset.isRelated = isRelated ? '1' : '';
         cardBySessionId[sessionId] = card;
         fillAccountInfo(card, account);
+        fillRelatedInfo(card, relatedToNick, relatedNicks);
+        if (isRelated) card.style.borderLeft = '4px solid #6c757d';
 
         if (createdBy) {
             var createdByEl = card.querySelector('.card-created-by');
@@ -598,13 +637,18 @@
         });
 
         setupPauseResume(card, sessionId, account.id);
+        if (isRelated) {
+            card.querySelector('.card-stop-btn').style.display = 'none';
+            card.querySelector('.card-timeup-stop-btn').style.display = 'none';
+        }
+
         document.getElementById('session-list').appendChild(card);
         updatePlayButton();
     }
 
     // ─── Restore a done card from server data ───────────────────────────────────
 
-    function restoreDoneCard(account, sessionId, remainingAfter, createdBy) {
+    function restoreDoneCard(account, sessionId, remainingAfter, createdBy, isRelated, relatedToNick, relatedNicks) {
         if (cardBySessionId[sessionId]) return;
         displayedAccountIds.add(account.id);
 
@@ -617,6 +661,8 @@
         cardBySessionId[sessionId] = card;
 
         fillAccountInfo(card, account);
+        fillRelatedInfo(card, relatedToNick, relatedNicks);
+        if (isRelated) card.style.borderLeft = '4px solid #6c757d';
         if (createdBy) {
             var createdByEl = card.querySelector('.card-created-by');
             if (createdByEl) {
@@ -753,7 +799,7 @@
                     var card = cardBySessionId[s.session_id];
 
                     if (!card) {
-                        restoreSessionCard(s.account, s.session_id, s.seconds_left, s.end_time, s.paused, s.created_by, s.timed_out, s.remaining_after);
+                        restoreSessionCard(s.account, s.session_id, s.seconds_left, s.end_time, s.paused, s.created_by, s.timed_out, s.remaining_after, s.is_related, s.related_to_nick, s.related_nicks);
                         sortSessionCards();
                         return;
                     }
@@ -780,6 +826,10 @@
                             markLastSession(card);
                         }
                         setupPauseResume(card, s.session_id, s.account.id);
+                        if (card.dataset.isRelated === '1' || s.is_related) {
+                            card.querySelector('.card-stop-btn').style.display = 'none';
+                            card.querySelector('.card-timeup-stop-btn').style.display = 'none';
+                        }
                         sortSessionCards();
                         return;
                     }
@@ -822,7 +872,7 @@
                     serverIds.add(d.session_id);
                     var existingCard = cardBySessionId[d.session_id];
                     if (!existingCard) {
-                        restoreDoneCard(d.account, d.session_id, d.remaining_after, d.created_by);
+                        restoreDoneCard(d.account, d.session_id, d.remaining_after, d.created_by, d.is_related, d.related_to_nick, d.related_nicks);
                         sortSessionCards();
                     } else if (existingCard._state !== 'done' && existingCard._state !== 'stopping') {
                         // Session was stopped by another user — transition card to done
@@ -834,7 +884,7 @@
                 (data.pending || []).forEach(function (p) {
                     serverIds.add(p.session_id);
                     if (!cardBySessionId[p.session_id]) {
-                        addSessionCard(p.account, p.duration_minutes, p.remaining_minutes, Date.now() + p.expires_in_seconds * 1000, p.session_id, p.last_session_minutes_ago);
+                        addSessionCard(p.account, p.duration_minutes, p.remaining_minutes, Date.now() + p.expires_in_seconds * 1000, p.session_id, p.last_session_minutes_ago, p.is_related, p.related_to_nick, p.related_nicks);
                         sortSessionCards();
                     }
                     var pCard = cardBySessionId[p.session_id];

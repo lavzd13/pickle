@@ -68,7 +68,7 @@ class AccountDetailForm(forms.ModelForm):
 
     class Meta:
         model = AccountDetail
-        fields = ['nick', 'device_name', 'email', 'platform', 'discipline', 'phone', 'creation_date']
+        fields = ['nick', 'device_name', 'email', 'platform', 'discipline', 'phone', 'related_to', 'creation_date']
         widgets = {
             'nick': forms.TextInput(attrs={'class': 'form-control'}),
             'device_name': forms.TextInput(attrs={'class': 'form-control'}),
@@ -76,6 +76,7 @@ class AccountDetailForm(forms.ModelForm):
             'platform': forms.Select(attrs={'class': 'form-control'}),
             'discipline': forms.Select(attrs={'class': 'form-control'}),
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
+            'related_to': forms.Select(attrs={'class': 'form-control'}),
             'creation_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
         }
 
@@ -86,6 +87,12 @@ class AccountDetailForm(forms.ModelForm):
             self.fields['discipline'].queryset = Disciplines.objects.filter(platform=self.instance.platform)
         else:
             self.fields['discipline'].queryset = Disciplines.objects.none()
+        # related_to: only show accounts that are not themselves related to another (potential main accounts)
+        related_qs = AccountDetail.objects.filter(related_to__isnull=True)
+        if self.instance and self.instance.pk:
+            related_qs = related_qs.exclude(pk=self.instance.pk)
+        self.fields['related_to'].queryset = related_qs
+        self.fields['related_to'].required = False
         if not self.instance.pk and not self.initial.get('creation_date'):
             self.fields['creation_date'].initial = timezone.localdate()
         if self.instance and self.instance.pk:

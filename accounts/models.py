@@ -78,6 +78,11 @@ class AccountDetail(models.Model):
     is_active_no_schedule = models.BooleanField(default=False)
     is_inactive = models.BooleanField(default=False)
     is_banned = models.BooleanField(default=False)
+    related_to = models.ForeignKey(
+        'self', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='related_accounts',
+        help_text='Main account this account is related to (max 2 related per main account)'
+    )
     creation_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -120,6 +125,18 @@ class AccountDetail(models.Model):
 
         if self.phone and qs.filter(phone=self.phone).exists():
             raise ValidationError({'phone': 'An account with this phone already exists on this platform.'})
+
+        if self.related_to:
+            # Cannot relate to self
+            if self.related_to_id == self.pk:
+                raise ValidationError({'related_to': 'An account cannot be related to itself.'})
+            # Cannot relate to an account that is itself related to another
+            if self.related_to.related_to_id:
+                raise ValidationError({'related_to': 'Cannot relate to an account that is already related to another account.'})
+            # Max 2 related accounts per main account
+            existing = self.related_to.related_accounts.exclude(pk=self.pk).count()
+            if existing >= 2:
+                raise ValidationError({'related_to': 'A main account can have at most 2 related accounts.'})
 
     def __str__(self):
         return f"{self.nick} ({self.platform})"

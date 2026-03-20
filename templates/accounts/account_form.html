@@ -78,6 +78,17 @@
                             {% endif %}
                         </div>
                     </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ account_form.related_to.id_for_label }}" class="form-label">Related To (Main Account)</label>
+                            {{ account_form.related_to }}
+                            {% if account_form.related_to.errors %}
+                            <div class="text-danger">{{ account_form.related_to.errors }}</div>
+                            {% endif %}
+                            <small class="form-text text-muted">Related accounts share the same play schedule as main account.</small>
+                        </div>
+                    </div>
                     
                     <div class="row mb-3">
                         <div class="col-12">
