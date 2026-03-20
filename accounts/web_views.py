@@ -635,6 +635,9 @@ def _get_eligible_accounts_for_sidebar():
     for acc in all_accounts:
         if acc.id in pending_first_wd_ids:
             continue
+        # Skip related accounts — they play with their main account
+        if acc.related_to_id:
+            continue
         try:
             hours = acc.play_info.schedule_of_the_week.get(day_name, -1)
         except Exception:
@@ -701,7 +704,7 @@ def eligible_account(request):
     day_name = today.strftime('%A')
     now_local = timezone.localtime()
 
-    all_accounts = list(AccountDetail.objects.select_related('play_info', 'payment', 'security').all())
+    all_accounts = list(AccountDetail.objects.select_related('play_info', 'payment', 'security').prefetch_related('related_accounts').all())
 
     # Auto-expire only pending sessions whose 20-min lock has passed
     # (playing/done sessions are only deactivated by explicit user action)
@@ -778,6 +781,9 @@ def eligible_account(request):
             continue
         if not acc.is_active:
             continue
+        # Skip related accounts — they only play when their main account plays
+        if acc.related_to_id:
+            continue
         try:
             hours = acc.play_info.schedule_of_the_week.get(day_name, -1)
         except Exception:
@@ -787,6 +793,16 @@ def eligible_account(request):
         schedule_minutes = hours * 60
         remaining = schedule_minutes - played_minutes.get(acc.id, 0)
         if remaining < 20:
+            continue
+        # Check if any active related account is on break — main waits too
+        related_on_break = False
+        related_ids = [r.id for r in acc.related_accounts.all() if r.is_active]
+        for rid in related_ids:
+            if rid in on_break_map:
+                on_break_eligible.append((acc, remaining, on_break_map[rid]))
+                related_on_break = True
+                break
+        if related_on_break:
             continue
         if acc.id in on_break_map:
             on_break_eligible.append((acc, remaining, on_break_map[acc.id]))
@@ -844,6 +860,7 @@ def eligible_account(request):
     # end_time = now + 20 min (the lock duration).
     # notes stores duration + remaining so active_sessions can restore the pending card.
     lock_end_time = (now_local + timedelta(minutes=20)).time()
+    notes_json = _json.dumps({'d': duration_minutes, 'r': round(remaining_minutes)})
     session = PlaySession.objects.create(
         account=acc,
         session_date=today,
@@ -852,8 +869,38 @@ def eligible_account(request):
         created_by=request.user,
         is_active=True,
         is_pending=True,
-        notes=_json.dumps({'d': duration_minutes, 'r': round(remaining_minutes)}),
+        notes=notes_json,
     )
+
+    # Create pending sessions for related accounts too
+    related_accs = list(acc.related_accounts.filter(is_active=True).select_related('payment', 'security'))
+    related_nicks = [r.nick for r in related_accs]
+    related_accounts_data = []
+    for rel_acc in related_accs:
+        rel_session = PlaySession.objects.create(
+            account=rel_acc,
+            session_date=today,
+            start_time=now_local.time(),
+            end_time=lock_end_time,
+            created_by=request.user,
+            is_active=True,
+            is_pending=True,
+            notes=notes_json,
+        )
+        related_accounts_data.append({
+            'session_id': rel_session.id,
+            'related_to_nick': acc.nick,
+            'account': {
+                'id': rel_acc.id,
+                'nick': rel_acc.nick,
+                'device_name': rel_acc.device_name,
+                'platform': str(rel_acc.platform) if rel_acc.platform else '',
+                'app_id': getattr(rel_acc, 'security', None) and rel_acc.security.app_id or '',
+                'phone': rel_acc.phone or '',
+                'withdraw_pass': rel_acc.payment.withdraw_pass if hasattr(rel_acc, 'payment') else '',
+                'min_balance': str(rel_acc.payment.min_balance) if hasattr(rel_acc, 'payment') else '0.00',
+            },
+        })
 
     return JsonResponse({
         'eligible': True,
@@ -863,6 +910,8 @@ def eligible_account(request):
         'expires_in_seconds': 1200,
         'session_id': session.id,
         'last_session_minutes_ago': last_session_minutes_ago,
+        'related_accounts': related_accounts_data,
+        'related_nicks': related_nicks,
     })
 
 
@@ -907,28 +956,28 @@ def active_sessions(request):
     if request.user.is_superuser:
         playing_qs = PlaySession.objects.filter(
             session_date=today, is_active=True, is_pending=False, is_done=False
-        ).select_related('account', 'account__payment', 'account__security', 'created_by')
+        ).select_related('account', 'account__payment', 'account__security', 'account__related_to', 'created_by').prefetch_related('account__related_accounts')
     else:
         playing_qs = PlaySession.objects.filter(
             session_date=today, is_active=True, is_pending=False, is_done=False,
             created_by=request.user
-        ).select_related('account', 'account__payment', 'account__security')
+        ).select_related('account', 'account__payment', 'account__security', 'account__related_to').prefetch_related('account__related_accounts')
 
     # Pending: always the current user's own sessions
     pending_qs = PlaySession.objects.filter(
         session_date=today, is_active=True, is_pending=True, created_by=request.user
-    ).select_related('account', 'account__payment', 'account__security')
+    ).select_related('account', 'account__payment', 'account__security', 'account__related_to').prefetch_related('account__related_accounts')
 
     # Done: superusers see all done sessions; others see own only
     if request.user.is_superuser:
         done_qs = PlaySession.objects.filter(
             session_date=today, is_active=True, is_pending=False, is_done=True
-        ).select_related('account', 'account__payment', 'account__security', 'created_by')
+        ).select_related('account', 'account__payment', 'account__security', 'account__related_to', 'created_by').prefetch_related('account__related_accounts')
     else:
         done_qs = PlaySession.objects.filter(
             session_date=today, is_active=True, is_pending=False, is_done=True,
             created_by=request.user
-        ).select_related('account', 'account__payment', 'account__security')
+        ).select_related('account', 'account__payment', 'account__security', 'account__related_to').prefetch_related('account__related_accounts')
 
     result = []
     for s in playing_qs:
@@ -960,6 +1009,9 @@ def active_sessions(request):
             'end_time': s.end_time.strftime('%H:%M'),
             'paused': s.paused,
             'created_by': s.created_by.username if s.created_by else None,
+            'is_related': bool(acc.related_to_id),
+            'related_to_nick': acc.related_to.nick if acc.related_to_id else None,
+            'related_nicks': [r.nick for r in acc.related_accounts.all()] if not acc.related_to_id else [],
             'account': {
                 'id': acc.id,
                 'nick': acc.nick,
@@ -996,6 +1048,9 @@ def active_sessions(request):
             'session_id': s.id,
             'remaining_after': remaining_after,
             'created_by': s.created_by.username if s.created_by else None,
+            'is_related': bool(acc.related_to_id),
+            'related_to_nick': acc.related_to.nick if acc.related_to_id else None,
+            'related_nicks': [r.nick for r in acc.related_accounts.all()] if not acc.related_to_id else [],
             'account': {
                 'id': acc.id,
                 'nick': acc.nick,
@@ -1043,6 +1098,9 @@ def active_sessions(request):
             'last_session_minutes_ago': last_mins_ago,
             'device_status': dc.status if dc else None,
             'device_error': dc.error_message if dc else '',
+            'is_related': bool(acc.related_to_id),
+            'related_to_nick': acc.related_to.nick if acc.related_to_id else None,
+            'related_nicks': [r.nick for r in acc.related_accounts.all()] if not acc.related_to_id else [],
             'account': {
                 'id': acc.id,
                 'nick': acc.nick,
@@ -1071,7 +1129,16 @@ def cancel_pending_session(request):
     data = json.loads(request.body)
     session_id = data.get('session_id')
 
-    PlaySession.objects.filter(pk=session_id, is_pending=True, created_by=request.user).delete()
+    session = PlaySession.objects.filter(pk=session_id, is_pending=True, created_by=request.user).select_related('account').first()
+    if session:
+        # Also cancel related accounts' pending sessions
+        related_ids = list(session.account.related_accounts.values_list('id', flat=True))
+        if related_ids:
+            PlaySession.objects.filter(
+                account_id__in=related_ids, session_date=timezone.localdate(),
+                is_pending=True, is_active=True, created_by=request.user
+            ).delete()
+        session.delete()
     return JsonResponse({'ok': True})
 
 
@@ -1276,6 +1343,29 @@ def stop_session(request):
         play_info.save(update_fields=['session_durations'])
     except PlayInfo.DoesNotExist:
         pass
+
+    # Also stop related accounts' active sessions
+    related_ids = list(session.account.related_accounts.values_list('id', flat=True))
+    if related_ids:
+        rel_sessions = PlaySession.objects.filter(
+            account_id__in=related_ids, session_date=today,
+            is_active=True, is_done=False, is_pending=False
+        )
+        for rel_s in rel_sessions:
+            rel_s.end_time = actual_stop_time
+            rel_s.is_done = True
+            rel_s.paused = False
+            rel_s.break_until = session.break_until
+            rel_s.notes = f"Given duration: {given_duration} min; Actual duration: {actual_minutes} min; Remaining: {remaining_after} min"
+            rel_s.save(update_fields=['end_time', 'is_done', 'paused', 'break_until', 'notes'])
+            try:
+                rel_play_info = rel_s.account.play_info
+                rel_durations = rel_play_info.session_durations or []
+                rel_durations.append(actual_minutes)
+                rel_play_info.session_durations = rel_durations
+                rel_play_info.save(update_fields=['session_durations'])
+            except PlayInfo.DoesNotExist:
+                pass
 
     return JsonResponse({'ok': True, 'remaining_after': remaining_after})
 
@@ -1738,6 +1828,19 @@ def expenses_history(request):
 
     total_expenses = qs.aggregate(total=Sum('amount'))['total'] or 0
 
+    # Calculate NET income from d/w reports for the same date range (completed only)
+    dep_qs = Deposit.objects.filter(status='completed')
+    wd_qs = Withdrawal.objects.filter(status='completed')
+    if date_from:
+        dep_qs = dep_qs.filter(created_at__date__gte=date_from)
+        wd_qs = wd_qs.filter(created_at__date__gte=date_from)
+    if date_to:
+        dep_qs = dep_qs.filter(created_at__date__lte=date_to)
+        wd_qs = wd_qs.filter(created_at__date__lte=date_to)
+    total_deposits = dep_qs.aggregate(total=Sum('amount'))['total'] or 0
+    total_withdrawals = wd_qs.aggregate(total=Sum('amount'))['total'] or 0
+    total_income = total_withdrawals - total_deposits
+
     entries = []
     for e in qs:
         entries.append({
@@ -1761,6 +1864,7 @@ def expenses_history(request):
     return JsonResponse({
         'entries': page_entries,
         'total_expenses': str(total_expenses),
+        'total_income': str(total_income),
         'pagination': {
             'page': page,
             'total_pages': total_pages,

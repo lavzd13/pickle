@@ -14,13 +14,29 @@
         </div>
     </div>
 
-    <!-- Total -->
+    <!-- Totals -->
     <div class="row mb-4 g-3">
-        <div class="col-12">
+        <div class="col-md-4">
             <div class="card h-100 border-0 shadow-sm">
                 <div class="card-body text-center py-3">
                     <div class="text-muted small mb-1">Total Expenses</div>
                     <div class="fs-4 fw-bold text-danger" id="total-expenses">&mdash;</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center py-3">
+                    <div class="text-muted small mb-1">Total Income (NET)</div>
+                    <div class="fs-4 fw-bold text-success" id="total-income">&mdash;</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center py-3">
+                    <div class="text-muted small mb-1">Total</div>
+                    <div class="fs-4 fw-bold" id="total-balance">&mdash;</div>
                 </div>
             </div>
         </div>
@@ -189,8 +205,14 @@ function loadHistory(params) {
     fetch('/expenses/history/' + (qs ? '?' + qs : ''))
         .then(r => r.json())
         .then(function (data) {
-            var total = parseFloat(data.total_expenses) || 0;
-            document.getElementById('total-expenses').textContent = total.toFixed(2);
+            var totalExp = parseFloat(data.total_expenses) || 0;
+            var totalInc = parseFloat(data.total_income) || 0;
+            var totalBal = totalInc - totalExp;
+            document.getElementById('total-expenses').textContent = totalExp.toFixed(2);
+            document.getElementById('total-income').textContent = totalInc.toFixed(2);
+            var balEl = document.getElementById('total-balance');
+            balEl.textContent = totalBal.toFixed(2);
+            balEl.className = 'fs-4 fw-bold ' + (totalBal >= 0 ? 'text-success' : 'text-danger');
 
             var tbody = document.getElementById('history-body');
             var pg = data.pagination;
