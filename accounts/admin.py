@@ -1,10 +1,23 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.models import User
 from .models import (
     AccountDetail, Payment, PlaySession, Platform,
     ProxyVpn, WalletProvider, Network,
     Location, Security, PlayInfo, LastTransaction,
     Deposit, Withdrawal, TaskLog, Disciplines, Expense,
 )
+
+
+# Protect superusers from deletion in admin
+admin.site.unregister(User)
+
+@admin.register(User)
+class UserAdmin(BaseUserAdmin):
+    def has_delete_permission(self, request, obj=None):
+        if obj is not None and obj.is_superuser:
+            return False
+        return super().has_delete_permission(request, obj)
 
 
 @admin.register(Platform)

@@ -564,6 +564,11 @@ def user_delete(request, pk):
     if user == request.user:
         messages.error(request, 'You cannot delete your own account!')
         return redirect('user_list')
+
+    # Prevent deleting other superusers
+    if user.is_superuser:
+        messages.error(request, 'Superuser accounts cannot be deleted!')
+        return redirect('user_list')
     
     if request.method == 'POST':
         username = user.username
