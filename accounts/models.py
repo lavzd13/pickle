@@ -448,6 +448,17 @@ class Expense(models.Model):
         return f"{self.expense} - {self.amount}"
 
 
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    is_system_admin = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'user_profile'
+
+    def __str__(self):
+        return f"{self.user.username} (system_admin={self.is_system_admin})"
+
+
 class TaskLog(models.Model):
     task_name = models.CharField(max_length=200)
     ran_at = models.DateTimeField(auto_now_add=True)

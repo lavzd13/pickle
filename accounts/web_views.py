@@ -76,6 +76,10 @@ def is_superuser(user):
     return user.is_superuser
 
 
+def is_system_admin(user):
+    return user.is_superuser and getattr(getattr(user, 'profile', None), 'is_system_admin', False)
+
+
 def _merge_intervals(sessions):
     """Merge overlapping time intervals and return total non-overlapping duration."""
     from datetime import datetime
@@ -489,7 +493,7 @@ def account_sessions(request, pk):
 # System Users Management
 
 @login_required
-@user_passes_test(is_superuser)
+@user_passes_test(is_system_admin)
 def user_list(request):
     """List all system users (superuser only)"""
     users = User.objects.all().order_by('-is_superuser', 'username')
@@ -501,7 +505,7 @@ def user_list(request):
 
 
 @login_required
-@user_passes_test(is_superuser)
+@user_passes_test(is_system_admin)
 def user_create(request):
     """Create a new system user (superuser only)"""
     if request.method == 'POST':
@@ -524,7 +528,7 @@ def user_create(request):
 
 
 @login_required
-@user_passes_test(is_superuser)
+@user_passes_test(is_system_admin)
 def user_edit(request, pk):
     """Edit a system user (superuser only)"""
     user = get_object_or_404(User, pk=pk)
@@ -555,7 +559,7 @@ def user_edit(request, pk):
 
 
 @login_required
-@user_passes_test(is_superuser)
+@user_passes_test(is_system_admin)
 def user_delete(request, pk):
     """Delete a system user (superuser only)"""
     user = get_object_or_404(User, pk=pk)

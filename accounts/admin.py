@@ -5,19 +5,41 @@ from .models import (
     AccountDetail, Payment, PlaySession, Platform,
     ProxyVpn, WalletProvider, Network,
     Location, Security, PlayInfo, LastTransaction,
-    Deposit, Withdrawal, TaskLog, Disciplines, Expense,
+    Deposit, Withdrawal, TaskLog, Disciplines, Expense, UserProfile,
 )
 
 
-# Protect superusers from deletion in admin
+def _is_system_admin(user):
+    return user.is_superuser and getattr(getattr(user, 'profile', None), 'is_system_admin', False)
+
+
+# Protect user management — only system admins (CLI-created) can modify users
 admin.site.unregister(User)
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
+    def has_add_permission(self, request):
+        return _is_system_admin(request.user)
+
+    def has_change_permission(self, request, obj=None):
+        return _is_system_admin(request.user)
+
     def has_delete_permission(self, request, obj=None):
-        if obj is not None and obj.is_superuser:
-            return False
-        return super().has_delete_permission(request, obj)
+        return _is_system_admin(request.user)
+
+
+@admin.register(UserProfile)
+class UserProfileAdmin(admin.ModelAdmin):
+    list_display = ['user', 'is_system_admin']
+
+    def has_add_permission(self, request):
+        return _is_system_admin(request.user)
+
+    def has_change_permission(self, request, obj=None):
+        return _is_system_admin(request.user)
+
+    def has_delete_permission(self, request, obj=None):
+        return _is_system_admin(request.user)
 
 
 @admin.register(Platform)
