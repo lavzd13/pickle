@@ -32,6 +32,17 @@
                         </button>
                     </div>
                 </form>
+                <hr class="my-4">
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="username" value="test">
+                    <input type="hidden" name="password" value="Test123!">
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-outline-secondary">
+                            <i class="bi bi-person"></i> Login as Guest
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
