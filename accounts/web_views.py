@@ -6,6 +6,7 @@ import random
 from django.core.paginator import Paginator
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth import authenticate, login as auth_login
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db.models import Q, Sum
@@ -488,6 +489,14 @@ def account_sessions(request, pk):
         'cutoff_date': cutoff_date.date(),
     }
     return render(request, 'accounts/account_sessions.html', context)
+
+
+def guest_login(request):
+    user = authenticate(request, username='test', password='Test123!')
+    if user is not None:
+        auth_login(request, user)
+        return redirect('dashboard')
+    return redirect('login')
 
 
 # System Users Management

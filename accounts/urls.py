@@ -6,6 +6,7 @@ urlpatterns = [
     # Authentication
     path('login/', auth_views.LoginView.as_view(template_name='accounts/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
+    path('guest-login/', web_views.guest_login, name='guest_login'),
     
     # Dashboard
     path('', web_views.dashboard, name='dashboard'),
